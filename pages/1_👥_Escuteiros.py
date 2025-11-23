@@ -44,18 +44,19 @@ with tab1:
         if response.data:
             df = pd.DataFrame(response.data)
             
-            # Buscar secção de cada escuteiro (da tabela blocos_rifas)
+            # Buscar todas as secções de uma vez (1 query apenas!)
+            blocos_response = supabase.table('blocos_rifas').select('escuteiro_id, seccao').not_.is_('escuteiro_id', 'null').execute()
+            
+            # Criar mapa escuteiro -> secção (pega a primeira secção do escuteiro)
             escuteiro_seccoes = {}
-            for escuteiro in response.data:
-                esc_id = escuteiro['id']
-                blocos_response = supabase.table('blocos_rifas').select('seccao').eq('escuteiro_id', esc_id).limit(1).execute()
-                if blocos_response.data and blocos_response.data[0].get('seccao'):
-                    escuteiro_seccoes[esc_id] = blocos_response.data[0]['seccao']
-                else:
-                    escuteiro_seccoes[esc_id] = '-'
+            if blocos_response.data:
+                for bloco in blocos_response.data:
+                    esc_id = bloco['escuteiro_id']
+                    if esc_id not in escuteiro_seccoes and bloco.get('seccao'):
+                        escuteiro_seccoes[esc_id] = bloco['seccao']
             
             # Adicionar coluna secção
-            df['seccao'] = df['id'].map(escuteiro_seccoes)
+            df['seccao'] = df['id'].map(lambda x: escuteiro_seccoes.get(x, '-'))
             
             # Formatar data
             if 'created_at' in df.columns:
