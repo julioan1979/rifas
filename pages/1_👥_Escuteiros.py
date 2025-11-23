@@ -58,6 +58,10 @@ with tab1:
             # Adicionar coluna secção
             df['seccao'] = df['id'].map(lambda x: escuteiro_seccoes.get(x, '-'))
             
+            # Formatar status ativo com ícones claros
+            if 'ativo' in df.columns:
+                df['status'] = df['ativo'].apply(lambda x: '✅ Ativo' if x else '❌ Inativo')
+            
             # Formatar data
             if 'created_at' in df.columns:
                 df['created_at'] = pd.to_datetime(df['created_at']).dt.strftime('%d-%m-%Y')
@@ -67,19 +71,20 @@ with tab1:
                 df['id_curto'] = df['id'].str[:8] + '...'
             
             # Reordenar colunas
-            colunas_ordem = ['id_curto', 'nome', 'seccao', 'email', 'telefone', 'ativo', 'created_at']
+            colunas_ordem = ['id_curto', 'nome', 'seccao', 'email', 'telefone', 'status', 'created_at']
             df = df[[col for col in colunas_ordem if col in df.columns]]
             
             st.dataframe(
                 df,
                 column_config={
                     "id": None,  # Ocultar ID completo
+                    "ativo": None,  # Ocultar coluna original
                     "id_curto": "ID",
                     "nome": "Nome",
                     "seccao": "Secção",
                     "email": "Email",
                     "telefone": "Telefone",
-                    "ativo": "Ativo",
+                    "status": "Status",
                     "created_at": "Data de Registo"
                 },
                 hide_index=True,
