@@ -82,19 +82,21 @@ with tab2:
         if not scouts_response.data:
             st.warning("⚠️ Não há escuteiros registados. Por favor, adicione escuteiros primeiro.")
         else:
+            # Scout selection OUTSIDE form to allow dynamic update
+            scouts_dict = {scout['nome']: scout for scout in scouts_response.data}
+            selected_scout = st.selectbox(
+                "Escuteiro *",
+                options=list(scouts_dict.keys()),
+                key="devolucao_scout_select"
+            )
+            
+            # Get blocks ONLY for selected scout
+            scout_id = scouts_dict[selected_scout]['id']
+            blocks_response = supabase.table('blocos_rifas').select(
+                'id, nome, numero_inicial, numero_final, campanha_id, campanhas(nome)'
+            ).eq('escuteiro_id', scout_id).execute()
+            
             with st.form("add_return_form"):
-                # Scout selection
-                scouts_dict = {scout['nome']: scout for scout in scouts_response.data}
-                selected_scout = st.selectbox(
-                    "Escuteiro *",
-                    options=list(scouts_dict.keys())
-                )
-                
-                # Get blocks ONLY for selected scout
-                scout_id = scouts_dict[selected_scout]['id']
-                blocks_response = supabase.table('blocos_rifas').select(
-                    'id, nome, numero_inicial, numero_final, campanha_id, campanhas(nome)'
-                ).eq('escuteiro_id', scout_id).execute()
                 
                 if not blocks_response.data:
                     st.warning(f"⚠️ O escuteiro **{selected_scout}** não tem blocos atribuídos.")
