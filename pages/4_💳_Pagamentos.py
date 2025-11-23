@@ -126,6 +126,12 @@ with tab1:
 with tab2:
     st.subheader("Registar Novo Pagamento")
     
+    st.info("""
+    **Atenção:** Esta página regista pagamentos de **vendas individuais** (comprador paga ao escuteiro).
+    
+    Para registar pagamentos do **escuteiro à organização**, use a página **💵 Controle Escuteiros**.
+    """)
+    
     # Load sales for selection
     try:
         sales_response = supabase.table('vendas').select(

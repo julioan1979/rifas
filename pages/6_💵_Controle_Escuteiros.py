@@ -7,6 +7,12 @@ st.set_page_config(page_title="Controle de Escuteiros", page_icon="💵", layout
 
 st.title("💵 Controle de Pagamentos e Canhotos")
 
+st.success("""
+✅ **Esta é a página correta para registar:**
+- 💰 Pagamentos dos escuteiros à organização (pelos blocos vendidos)
+- 📋 Devolução de canhotos das rifas vendidas
+""")
+
 st.info("""
 📋 **Fluxo de Trabalho:**
 1. Escuteiro recebe bloco de rifas atribuído
@@ -14,6 +20,8 @@ st.info("""
 3. **Escuteiro paga o dinheiro** à organização (registar aqui)
 4. **Escuteiro devolve os canhotos** das rifas vendidas (registar aqui)
 """)
+
+st.divider()
 
 # Initialize Supabase client
 try:
@@ -160,6 +168,8 @@ with tab1:
 with tab2:
     st.subheader("Registar Pagamento e Devolução de Canhotos")
     
+    st.info("💡 **Aqui aparecem TODOS os blocos atribuídos**, independentemente de já terem pagamento ou não. Pode registar pagamentos parciais ou completos.")
+    
     try:
         # Get assigned blocks for this campaign
         blocks_response = supabase.table('blocos_rifas').select(
@@ -175,7 +185,18 @@ with tab2:
                 esc_nome = block.get('escuteiros', {}).get('nome', 'N/A') if block.get('escuteiros') else 'N/A'
                 total_rifas = block['numero_final'] - block['numero_inicial'] + 1
                 valor_bloco = total_rifas * float(block['preco_unitario'])
-                display = f"{esc_nome} | Rifas {block['numero_inicial']}-{block['numero_final']} | {valor_bloco:.2f} €"
+                
+                # Show payment status in dropdown
+                valor_pago_atual = block.get('valor_pago', 0) or 0
+                valor_a_pagar = block.get('valor_a_pagar') or valor_bloco
+                if valor_pago_atual >= valor_a_pagar:
+                    status = "✅ Pago"
+                elif valor_pago_atual > 0:
+                    status = f"⏳ {valor_pago_atual:.2f}€/{valor_a_pagar:.2f}€"
+                else:
+                    status = "❌ Pendente"
+                
+                display = f"{status} | {esc_nome} | Rifas {block['numero_inicial']}-{block['numero_final']} | {valor_bloco:.2f} €"
                 blocks_dict[display] = block
             
             selected_block_display = st.selectbox(
