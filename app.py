@@ -62,20 +62,20 @@ col1, col2, col3, col4 = st.columns(4)
 
 try:
     # Count scouts
-    response_scouts = supabase.table('escuteiros').select('id', count='exact').execute()
-    total_scouts = response_scouts.count if hasattr(response_scouts, 'count') else 0
+    response_scouts = supabase.table('escuteiros').select('*', count='exact').execute()
+    total_scouts = response_scouts.count if hasattr(response_scouts, 'count') else len(response_scouts.data)
     
     # Count raffle blocks
-    response_blocks = supabase.table('blocos_rifas').select('id', count='exact').execute()
-    total_blocks = response_blocks.count if hasattr(response_blocks, 'count') else 0
+    response_blocks = supabase.table('blocos_rifas').select('*', count='exact').execute()
+    total_blocks = response_blocks.count if hasattr(response_blocks, 'count') else len(response_blocks.data)
     
     # Count sales
-    response_sales = supabase.table('vendas').select('id', count='exact').execute()
-    total_sales = response_sales.count if hasattr(response_sales, 'count') else 0
+    response_sales = supabase.table('vendas').select('*', count='exact').execute()
+    total_sales = response_sales.count if hasattr(response_sales, 'count') else len(response_sales.data)
     
     # Count payments
-    response_payments = supabase.table('pagamentos').select('id', count='exact').execute()
-    total_payments = response_payments.count if hasattr(response_payments, 'count') else 0
+    response_payments = supabase.table('pagamentos').select('*', count='exact').execute()
+    total_payments = response_payments.count if hasattr(response_payments, 'count') else len(response_payments.data)
     
     col1.metric("👥 Escuteiros", total_scouts)
     col2.metric("🎟️ Blocos de Rifas", total_blocks)
