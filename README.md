@@ -1,284 +1,191 @@
 # 🎫 Sistema de Gestão de Rifas dos Escuteiros
 
-Sistema completo desenvolvido em **Streamlit** com backend **Supabase** para gerir rifas distribuídas aos escuteiros, incluindo gestão de escuteiros, blocos de rifas, vendas, pagamentos e devoluções.
+Sistema completo desenvolvido em **Streamlit** com backend **Supabase** para gerir campanhas de rifas, incluindo controle financeiro completo e gestão de irmãos.
 
-![Python](https://img.shields.io/badge/python-3.8+-blue.svg)
+![Python](https://img.shields.io/badge/python-3.12+-blue.svg)
 ![Streamlit](https://img.shields.io/badge/streamlit-1.31+-red.svg)
 ![Supabase](https://img.shields.io/badge/supabase-enabled-green.svg)
 
 ## ✨ Funcionalidades
 
-### 👥 Gestão de Escuteiros
-- ➕ Adicionar, editar e remover escuteiros
-- 📋 Listagem com filtros e pesquisa
+### 📅 Gestão de Campanhas
+- ✅ Múltiplas campanhas simultâneas
+- 📦 Criação automática de blocos ao criar campanha
+- 🔄 Ativar/desativar campanhas
+- 📊 Filtros por campanha em todas as páginas
+
+### 👥 Gestão de Escuteiros  
+- ➕ Adicionar escuteiros únicos (sem duplicados)
+- 📋 Organização por secções (Lobitos, Exploradores, Pioneiros, Caminheiros, CPP)
+- 👨‍👩‍👧‍👦 Sistema de identificação de irmãos
 - ✅ Controlo de escuteiros ativos/inativos
-- 📧 Validação de emails e telefones
 
-### 🎟️ Blocos de Rifas
-- 📦 Criar e gerir blocos de rifas
-- 🔢 Definir intervalos de números (inicial-final)
-- 💰 Configurar preços unitários
-- 👤 Atribuir blocos a escuteiros
-- 📊 Controlo de estados (disponível, atribuído, vendido, devolvido)
+### ��️ Blocos de Rifas (Sistema Avançado)
+- 📦 **Criação automática** ao criar campanha
+- 🏷️ **Reserva por secção** (sem atribuição específica)
+- 👤 **Atribuição individual** com prevenção de duplicação
+- 👨‍👩‍👧‍👦 **Atribuição para irmãos** com divisão automática
+- 🔒 Prevenção de reatribuição de blocos já atribuídos
+- 📊 3 tabs: Lista, Reservar por Secção, Atribuir a Escuteiro
 
-### 💰 Vendas
-- 📝 Registar vendas por escuteiro
-- 📊 Cálculo automático de valores
-- 📅 Histórico de vendas com filtros
-- 📈 Estatísticas e relatórios
+### 💵 Controle Financeiro Completo
+- 💰 **Pagamentos:** Escuteiro → Organização
+- 📋 **Canhotos:** Controle de devolução
+- 📊 Dashboard com status visual
+- ✅ Rastreamento individual por bloco
+- 📅 Datas de pagamento e devolução
 
-### 💳 Pagamentos
-- 💵 Registar pagamentos recebidos
-- 🔄 Múltiplos métodos de pagamento
-- 💰 Controlo de saldos pendentes
-- 📑 Referências e observações
+## 🚀 Deploy no Streamlit Cloud
 
-### 🔄 Devoluções
-- ↩️ Registar devoluções de rifas
-- 📝 Motivos de devolução
-- 📊 Estatísticas de devoluções
-
-### 📊 Dashboard
-- 📈 Visão geral com métricas principais
-- 📊 Gráficos interativos (Plotly)
-- 💶 Resumo financeiro
-- 🎯 Análise de vendas por escuteiro
-- 📉 Evolução temporal das vendas
-
-## 🚀 Instalação e Configuração
-
-### Pré-requisitos
-- Python 3.8 ou superior
-- Conta no [Supabase](https://supabase.com)
-- Git (opcional)
-
-### 1. Clonar o Repositório
-
-```bash
-git clone https://github.com/julioan1979/rifas.git
-cd rifas
-```
-
-### 2. Instalar Dependências
-
-```bash
-pip install -r requirements.txt
-```
-
-### 3. Configurar Supabase
-
-#### 3.1 Criar Projeto no Supabase
-1. Aceda a [supabase.com](https://supabase.com)
-2. Crie um novo projeto
-3. Aguarde a criação do projeto
-4. Copie a **URL do projeto** e a **chave anon/public**
-
-#### 3.2 Criar Tabelas na Base de Dados
-1. No Supabase, aceda ao **SQL Editor**
-2. Copie todo o conteúdo SQL do ficheiro `utils/database_schema.py`
-3. Execute o SQL para criar todas as tabelas, índices e views
-
-### 4. Configurar Credenciais
-
-#### Opção A: Desenvolvimento Local (Ficheiro .env)
-
-Crie um ficheiro `.env` na raiz do projeto:
-
-```bash
-SUPABASE_URL=https://seu-projeto.supabase.co
-SUPABASE_KEY=sua_chave_anon_publica_aqui
-```
-
-#### Opção B: GitHub Codespaces / CI
-
-Configure as variáveis de ambiente:
-
-```bash
-export SUPABASE_URL='https://seu-projeto.supabase.co'
-export SUPABASE_KEY='sua_chave_anon_publica_aqui'
-```
-
-Ou adicione no GitHub:
-1. Settings → Secrets and variables → Actions
-2. New repository secret:
-   - `SUPABASE_URL`
-   - `SUPABASE_KEY`
-
-#### Opção C: Streamlit Cloud (Deploy)
-
-1. Aceda ao dashboard do Streamlit Cloud
-2. Selecione a sua aplicação
-3. Settings → Secrets
-4. Adicione:
-
-```toml
-[supabase]
-url = "https://seu-projeto.supabase.co"
-key = "sua_chave_anon_publica_aqui"
-```
-
-### 5. Executar a Aplicação
-
-```bash
-streamlit run app.py
-```
-
-A aplicação abrirá automaticamente em `http://localhost:8501`
-
-## 🌐 Deploy no Streamlit Cloud
-
-### Passo 1: Preparar o Repositório GitHub
-1. Faça push do código para o GitHub
-2. Certifique-se que os ficheiros estão na raiz:
-   - `app.py`
-   - `requirements.txt`
-   - `utils/`
-   - `pages/`
+### Passo 1: Configurar Supabase
+1. Crie projeto em [supabase.com](https://supabase.com)
+2. Execute SQL em `SETUP_DATABASE.md` no SQL Editor
+3. Copie URL e chave do projeto
 
 ### Passo 2: Deploy
 1. Aceda a [share.streamlit.io](https://share.streamlit.io)
 2. Faça login com GitHub
 3. Clique em **"New app"**
-4. Selecione:
+4. Configure:
    - Repository: `julioan1979/rifas`
    - Branch: `main`
-   - Main file path: `app.py`
-5. Clique em **Advanced settings**
-6. Adicione as secrets (ver secção "Opção C" acima)
-7. Clique em **Deploy!**
+   - Main file: `app.py`
+5. Em **Advanced settings → Secrets**, adicione:
+   ```toml
+   SUPABASE_URL = "sua_url_supabase"
+   SUPABASE_KEY = "sua_chave_supabase"
+   ```
+6. Clique em **Deploy**
+
+## 🖥️ Desenvolvimento Local
+
+```bash
+# Clone o repositório
+git clone https://github.com/julioan1979/rifas.git
+cd rifas
+
+# Instale as dependências
+pip install -r requirements.txt
+
+# Configure as credenciais
+cp .env.example .env
+# Edite .env com suas credenciais Supabase
+
+# Execute a aplicação
+streamlit run app.py
+```
 
 ## 📁 Estrutura do Projeto
 
 ```
 rifas/
-├── app.py                          # Página principal com dashboard
-├── requirements.txt                # Dependências Python
-├── README.md                       # Este ficheiro
-├── LICENSE                         # Licença do projeto
-├── .streamlit/
-│   └── config.toml                # Configuração do Streamlit
+├── app.py                          # Dashboard principal
+├── requirements.txt                # Dependências
+├── pages/                          # Páginas da aplicação
+│   ├── 1_👥_Escuteiros.py         # Gestão de escuteiros
+│   ├── 2_🎟️_Blocos_de_Rifas.py   # Gestão de blocos (3 tabs)
+│   ├── 3_💰_Vendas.py             # Registro de vendas
+│   ├── 4_💳_Pagamentos.py         # Pagamentos
+│   ├── 5_🔄_Devoluções.py         # Devoluções
+│   ├── 6_💵_Controle_Escuteiros.py # Controle financeiro
+│   └── 7_📅_Campanhas.py          # Gestão de campanhas
 ├── utils/
-│   ├── supabase_client.py         # Cliente Supabase com auto-detecção
-│   └── database_schema.py         # Schema SQL completo
-└── pages/
-    ├── 1_👥_Escuteiros.py         # Gestão de escuteiros
-    ├── 2_🎟️_Blocos_de_Rifas.py  # Gestão de blocos
-    ├── 3_💰_Vendas.py             # Gestão de vendas
-    ├── 4_💳_Pagamentos.py         # Gestão de pagamentos
-    └── 5_🔄_Devoluções.py         # Gestão de devoluções
+│   ├── supabase_client.py         # Cliente Supabase
+│   └── database_schema.py         # Schema SQL
+├── scripts/                        # Scripts utilitários
+│   ├── limpar_base_dados.py       # Limpeza da BD
+│   └── importar_natal_2025_corrigido.py # Importação
+└── .streamlit/
+    └── config.toml                 # Configuração
 ```
 
-## 🔒 Segurança
+## 📊 Fluxo de Trabalho
 
-### Gestão de Credenciais
-✅ **Nunca** adicione credenciais diretamente no código  
-✅ Use `st.secrets` no Streamlit Cloud  
-✅ Use variáveis de ambiente ou ficheiro `.env` localmente  
-✅ Adicione `.env` ao `.gitignore`  
+### 1. Criar Campanha
+- Aceda a **📅 Campanhas**
+- Defina nome, datas, preço por rifa, total de rifas
+- Sistema cria blocos automaticamente
 
-### Row Level Security (RLS)
-O schema SQL inclui políticas RLS básicas. Para produção:
-1. Configure políticas mais restritivas no Supabase
-2. Implemente autenticação de utilizadores
-3. Restrinja acessos por perfil
+### 2. Reservar/Atribuir Blocos
+- Aceda a **🎟️ Blocos de Rifas**
+- **Tab 2:** Reservar por secção (sem escuteiro específico)
+- **Tab 3:** Atribuir individual ou para irmãos
 
-## 📊 Base de Dados
+### 3. Escuteiros Vendem Rifas
+- Escuteiros vendem rifas aos compradores
+- Preenchem canhotos com dados do comprador
+
+### 4. Registar Pagamento e Canhotos
+- Aceda a **💵 Controle Escuteiros**
+- Registar quando escuteiro paga dinheiro
+- Registar quando devolve canhotos
+
+### 5. Acompanhar Status
+- Dashboard mostra métricas em tempo real
+- Status visual: ✅ Pago, ⏳ Pendente, ❌ Em falta
+
+## 🗄️ Base de Dados
 
 ### Tabelas Principais
+- `campanhas` - Campanhas de rifas
+- `escuteiros` - Cadastro de escuteiros
+- `blocos_rifas` - Blocos com controle completo
+- `vendas` - Registro de vendas
+- `pagamentos` - Pagamentos
+- `devolucoes` - Devoluções
 
-| Tabela | Descrição |
-|--------|-----------|
-| `escuteiros` | Dados dos escuteiros |
-| `blocos_rifas` | Blocos de rifas |
-| `vendas` | Registo de vendas |
-| `pagamentos` | Pagamentos recebidos |
-| `devolucoes` | Devoluções de rifas |
+### Colunas de Controle (blocos_rifas)
+- `valor_a_pagar`, `valor_pago` - Controle financeiro
+- `rifas_vendidas`, `canhotos_devolvidos` - Status
+- `data_pagamento`, `data_devolucao_canhotos` - Datas
+- `observacoes_pagamento`, `observacoes_canhotos` - Notas
 
-### Views Disponíveis
-- `vw_vendas_por_escuteiro` - Resumo de vendas por escuteiro
-- `vw_blocos_status` - Estado dos blocos de rifas
+## 🛠️ Scripts Utilitários
 
-## 🛠️ Desenvolvimento
+### Limpar Base de Dados
+```bash
+python scripts/limpar_base_dados.py
+```
+⚠️ **ATENÇÃO:** Apaga todos os dados!
 
-### Adicionar Nova Página
-1. Crie um ficheiro em `pages/` com o formato: `N_🔸_Nome.py`
-2. O Streamlit detecta automaticamente
-3. Use o template das páginas existentes
+### Importar Dados
+```bash
+python scripts/importar_natal_2025_corrigido.py
+```
+✅ Importa escuteiros únicos, sem duplicados
+✅ Identifica relações de irmãos
+✅ Cria blocos e atribuições
 
-### Personalizar Tema
-Edite `.streamlit/config.toml`:
-- `primaryColor` - Cor principal
-- `backgroundColor` - Cor de fundo
-- `secondaryBackgroundColor` - Cor secundária
-- `textColor` - Cor do texto
+## 🔧 Tecnologias
 
-## 📝 Como Usar
-
-### 1. Adicionar Escuteiros
-1. Aceda à página **👥 Escuteiros**
-2. No separador **➕ Adicionar**
-3. Preencha nome (obrigatório), email e telefone (opcionais)
-4. Clique em **Adicionar Escuteiro**
-
-### 2. Criar Blocos de Rifas
-1. Aceda à página **🎟️ Blocos de Rifas**
-2. No separador **➕ Adicionar**
-3. Defina nome, números (inicial-final) e preço
-4. Opcionalmente, atribua a um escuteiro
-5. Clique em **Criar Bloco de Rifas**
-
-### 3. Registar Vendas
-1. Aceda à página **💰 Vendas**
-2. No separador **➕ Registar Venda**
-3. Selecione escuteiro e bloco
-4. Digite a quantidade vendida
-5. O valor é calculado automaticamente
-6. Clique em **Registar Venda**
-
-### 4. Registar Pagamentos
-1. Aceda à página **💳 Pagamentos**
-2. No separador **➕ Registar Pagamento**
-3. Selecione a venda
-4. Digite o valor pago
-5. Selecione o método de pagamento
-6. Clique em **Registar Pagamento**
-
-## 🐛 Resolução de Problemas
-
-### Erro: "Credenciais não encontradas"
-- Verifique se configurou `SUPABASE_URL` e `SUPABASE_KEY`
-- No Streamlit Cloud, verifique as Secrets
-- Localmente, verifique o ficheiro `.env`
-
-### Erro: "Tabela não encontrada"
-- Execute o SQL completo do ficheiro `database_schema.py`
-- Verifique a consola do Supabase para erros
-
-### Aplicação não carrega
-- Verifique `requirements.txt`
-- Reinstale as dependências: `pip install -r requirements.txt --upgrade`
-- Limpe cache do Streamlit: `streamlit cache clear`
-
-## 📧 Suporte
-
-Para questões ou sugestões:
-1. Abra uma issue no GitHub
-2. Contacte o administrador do sistema
+- **Frontend:** Streamlit 1.31.0+
+- **Backend:** Supabase (PostgreSQL)
+- **Python:** 3.12+
+- **Bibliotecas:** Pandas 2.2.0, Plotly 5.18.0
 
 ## 📄 Licença
 
-Este projeto está licenciado sob a [MIT License](LICENSE).
+MIT License - Ver arquivo `LICENSE`
 
-## 🙏 Créditos
+## 🎯 Funcionalidades Avançadas
 
-Desenvolvido para a gestão de rifas dos Escuteiros.
+### Sistema de Irmãos
+- Radio button: Individual vs Irmãos
+- Divisão automática de blocos
+- Primeiro irmão recebe rifas extras (se ímpar)
+- Nomes de todos os irmãos nos blocos criados
 
-Tecnologias utilizadas:
-- [Streamlit](https://streamlit.io) - Framework de aplicações web
-- [Supabase](https://supabase.com) - Backend e base de dados
-- [Plotly](https://plotly.com) - Gráficos interativos
-- [Pandas](https://pandas.pydata.org) - Análise de dados
+### Prevenção de Duplicação
+- Filtro `.is_('escuteiro_id', 'null')` mostra apenas blocos não atribuídos
+- Impossível reatribuir bloco já atribuído
+- Escuteiros únicos na importação
+
+### Controle Completo
+- Pagamento: Escuteiro → Organização
+- Canhotos: Rifas vendidas devolvidas
+- Status visual em tempo real
+- Dashboard com métricas consolidadas
 
 ---
 
-**⭐ Se este projeto foi útil, considere dar uma estrela no GitHub!**
+**Desenvolvido com ❤️ para Escuteiros**
