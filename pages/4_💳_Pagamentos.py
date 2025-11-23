@@ -146,36 +146,70 @@ with tab2:
                     payments_by_sale[sale_id] += float(payment['valor_pago'])
             
             # Create sales list with payment status
-            sales_list = []
+            sales_list_pendentes = []
+            sales_list_pagas = []
+            
             for sale in sales_response.data:
                 scout_name = sale.get('escuteiros', {}).get('nome', 'N/A') if sale.get('escuteiros') else 'N/A'
-                block_name = sale.get('blocos_rifas', {}).get('nome', 'N/A') if sale.get('blocos_rifas') else 'N/A'
+                block_info = f"Rifas {sale.get('blocos_rifas', {}).get('numero_inicial', '')}-{sale.get('blocos_rifas', {}).get('numero_final', '')}"
                 valor_total = float(sale['valor_total'])
                 valor_pago = payments_by_sale.get(sale['id'], 0)
                 saldo = valor_total - valor_pago
                 
-                status = "✅ Pago" if saldo <= 0 else f"⚠️ Pendente: {saldo:.2f} €"
-                label = f"{sale['data_venda'][:10]} - {scout_name} - {block_name} - {valor_total:.2f} € ({status})"
-                sales_list.append((label, sale, saldo))
+                if saldo > 0.01:  # Tem saldo pendente
+                    status = f"⏳ Pendente: {saldo:.2f} €"
+                    label = f"{sale['data_venda'][:10]} - {scout_name} - {block_info} - {valor_total:.2f} € ({status})"
+                    sales_list_pendentes.append((label, sale, saldo))
+                else:  # Já pago
+                    status = "✅ Pago"
+                    label = f"{sale['data_venda'][:10]} - {scout_name} - {block_info} - {valor_total:.2f} € ({status})"
+                    sales_list_pagas.append((label, sale, saldo))
+            
+            # Show filter option
+            mostrar_todas = st.checkbox(
+                "Mostrar também vendas já pagas",
+                value=False,
+                help="Por padrão, mostra apenas vendas com pagamento pendente"
+            )
+            
+            if mostrar_todas:
+                sales_list = sales_list_pendentes + sales_list_pagas
+            else:
+                sales_list = sales_list_pendentes
+            
+            if not sales_list:
+                if mostrar_todas:
+                    st.info("Não há vendas registadas nesta campanha.")
+                else:
+                    st.success("✅ Todas as vendas desta campanha estão pagas!")
+                    st.info("Active a opção 'Mostrar também vendas já pagas' para ver todas as vendas.")
+            else:
+                st.info(f"📊 **{len(sales_list_pendentes)}** vendas com pagamento pendente | **{len(sales_list_pagas)}** vendas pagas")
             
             with st.form("add_payment_form"):
                 # Sale selection
                 sales_dict = {label: (sale, saldo) for label, sale, saldo in sales_list}
-                selected_sale_label = st.selectbox(
-                    "Venda *",
-                    options=list(sales_dict.keys())
-                )
+                
+                if not sales_dict:
+                    st.warning("⚠️ Não há vendas disponíveis para registar pagamento.")
+                    st.form_submit_button("Registar Pagamento", type="primary", disabled=True)
+                else:
+                    selected_sale_label = st.selectbox(
+                        "Venda *",
+                        options=list(sales_dict.keys()),
+                        help="Vendas pendentes aparecem primeiro"
+                    )
                 
                 if selected_sale_label:
                     selected_sale, saldo_pendente = sales_dict[selected_sale_label]
                     valor_total = float(selected_sale['valor_total'])
                     
-                    if saldo_pendente > 0:
+                    if saldo_pendente > 0.01:
                         st.info(f"💶 Valor da Venda: **{valor_total:.2f} €** | Saldo Pendente: **{saldo_pendente:.2f} €**")
                         default_valor = saldo_pendente
                     else:
-                        st.success(f"✅ Esta venda já está totalmente paga ({valor_total:.2f} €)")
-                        default_valor = 0.0
+                        st.warning(f"⚠️ Esta venda já está totalmente paga ({valor_total:.2f} €)")
+                        default_valor = 0.01
                     
                     # Payment amount
                     valor_pago = st.number_input(
