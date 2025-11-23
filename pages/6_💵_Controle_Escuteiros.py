@@ -83,8 +83,8 @@ with tab1:
             # Check payment status
             if 'valor_pago' in df.columns and 'valor_a_pagar' in df.columns:
                 df['status_pagamento'] = df.apply(
-                    lambda row: '✅ Pago' if row['valor_pago'] >= row['valor_a_pagar'] 
-                    else f"⏳ {row['valor_pago']:.2f}€/{row['valor_a_pagar']:.2f}€" if row['valor_pago'] > 0
+                    lambda row: '✅ Pago' if (row['valor_pago'] is not None and row['valor_a_pagar'] is not None and row['valor_pago'] >= row['valor_a_pagar']) 
+                    else f"⏳ {row['valor_pago']:.2f}€/{row['valor_a_pagar']:.2f}€" if (row['valor_pago'] is not None and row['valor_pago'] > 0)
                     else '❌ Pendente',
                     axis=1
                 )
