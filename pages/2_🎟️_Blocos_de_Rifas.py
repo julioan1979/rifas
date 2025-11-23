@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import unicodedata
 from utils.supabase_client import get_supabase_client
 
 st.set_page_config(page_title="Blocos de Rifas", page_icon="🎟️", layout="wide")
@@ -7,6 +8,16 @@ st.set_page_config(page_title="Blocos de Rifas", page_icon="🎟️", layout="wi
 st.title("🎟️ Gestão de Blocos de Rifas")
 
 st.info("💡 **Nota:** Os blocos de rifas são criados automaticamente na página 'Campanhas'. Aqui pode atribuir blocos aos escuteiros.")
+
+# Helper function to normalize text (remove accents)
+def normalize_text(text):
+    """Remove accents and convert to lowercase for search"""
+    if not text:
+        return ""
+    # Remove accents
+    nfd = unicodedata.normalize('NFD', text)
+    text_without_accents = ''.join(char for char in nfd if unicodedata.category(char) != 'Mn')
+    return text_without_accents.lower()
 
 # Initialize Supabase client
 try:
@@ -385,20 +396,56 @@ with tab3:
                     
                     st.divider()
                     
+                    # Campo de busca para filtrar escuteiros
+                    search_term = st.text_input(
+                        "🔍 Pesquisar Escuteiro", 
+                        placeholder="Digite o nome (funciona com ou sem acentos)...",
+                        key="search_individual"
+                    )
+                    
                     with st.form("assign_block_form"):
                         # Escuteiro selection (allow None for unassignment)
-                        escuteiro_options = ["-- Sem atribuição --"] + [e['nome'] for e in escuteiros_response.data]
+                        all_escuteiros = [e['nome'] for e in escuteiros_response.data]
+                        
+                        # Filtrar escuteiros se houver busca
+                        if search_term:
+                            search_normalized = normalize_text(search_term)
+                            filtered_escuteiros = [
+                                nome for nome in all_escuteiros 
+                                if search_normalized in normalize_text(nome)
+                            ]
+                            escuteiro_options = ["-- Sem atribuição --"] + filtered_escuteiros
+                        else:
+                            escuteiro_options = ["-- Sem atribuição --"] + all_escuteiros
+                        
+                        # Campo de busca com filtro
+                        search_escuteiro = st.text_input(
+                            "🔍 Buscar Escuteiro",
+                            placeholder="Digite o nome (com ou sem acentos)...",
+                            key="search_individual"
+                        )
+                        
+                        # Filtrar opções baseado na busca
+                        if search_escuteiro:
+                            search_normalized = normalize_text(search_escuteiro)
+                            filtered_options = [opt for opt in escuteiro_options 
+                                              if search_normalized in normalize_text(opt)]
+                            if not filtered_options:
+                                st.warning("Nenhum escuteiro encontrado com esse nome.")
+                                filtered_options = escuteiro_options
+                        else:
+                            filtered_options = escuteiro_options
                         
                         # Get current assignment
                         current_idx = 0
                         if block.get('escuteiro_id'):
                             current_name = escuteiros_dict.get(block['escuteiro_id'])
-                            if current_name in escuteiro_options:
-                                current_idx = escuteiro_options.index(current_name)
+                            if current_name in filtered_options:
+                                current_idx = filtered_options.index(current_name)
                         
                         selected_escuteiro_name = st.selectbox(
                             "2️⃣ Atribuir a Escuteiro",
-                            options=escuteiro_options,
+                            options=filtered_options,
                             index=current_idx,
                             help="Selecione o escuteiro que ficará responsável por este bloco"
                         )

@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import re
+import unicodedata
 from utils.supabase_client import get_supabase_client
 
 st.set_page_config(page_title="Escuteiros", page_icon="👥", layout="wide")
@@ -8,6 +9,15 @@ st.set_page_config(page_title="Escuteiros", page_icon="👥", layout="wide")
 st.title("👥 Gestão de Escuteiros")
 
 # Helper functions
+def normalize_text(text):
+    """Remove accents and convert to lowercase for search"""
+    if not text:
+        return ""
+    # Remove accents
+    nfd = unicodedata.normalize('NFD', text)
+    text_without_accents = ''.join(char for char in nfd if unicodedata.category(char) != 'Mn')
+    return text_without_accents.lower()
+
 def validate_email(email):
     """Validate email format"""
     if not email:
@@ -140,10 +150,30 @@ with tab3:
         if response.data:
             # Create a dictionary for scout selection (apenas nome, sem ID)
             scouts_dict = {scout['nome']: scout for scout in response.data}
+            scout_names = sorted(scouts_dict.keys())
+            
+            # Campo de busca
+            search_scout = st.text_input(
+                "🔍 Buscar Escuteiro",
+                placeholder="Digite o nome (com ou sem acentos)...",
+                key="search_edit_scout"
+            )
+            
+            # Filtrar opções baseado na busca
+            if search_scout:
+                search_normalized = normalize_text(search_scout)
+                filtered_names = [name for name in scout_names 
+                                 if search_normalized in normalize_text(name)]
+                if not filtered_names:
+                    st.warning("Nenhum escuteiro encontrado com esse nome.")
+                    filtered_names = scout_names
+            else:
+                filtered_names = scout_names
             
             selected_scout_name = st.selectbox(
                 "Selecione um escuteiro",
-                options=sorted(scouts_dict.keys())
+                options=filtered_names,
+                key="select_edit_scout"
             )
             
             if selected_scout_name:
