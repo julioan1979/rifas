@@ -34,7 +34,9 @@ ENV/
 
 # Environment variables
 .env
+.env.*
 .env.local
+.env.supabase
 
 # Streamlit
 .streamlit/secrets.toml

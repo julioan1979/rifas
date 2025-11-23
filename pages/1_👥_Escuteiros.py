@@ -1,10 +1,28 @@
 import streamlit as st
 import pandas as pd
+import re
 from utils.supabase_client import get_supabase_client
 
 st.set_page_config(page_title="Escuteiros", page_icon="👥", layout="wide")
 
 st.title("👥 Gestão de Escuteiros")
+
+# Helper functions
+def validate_email(email):
+    """Validate email format"""
+    if not email:
+        return True  # Email is optional
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
+
+def validate_phone(phone):
+    """Validate phone format (Portuguese format)"""
+    if not phone:
+        return True  # Phone is optional
+    # Remove spaces and common separators
+    phone_clean = phone.replace(' ', '').replace('-', '').replace('+', '')
+    # Check if it's a valid Portuguese number (9 digits starting with 9, or with country code)
+    return len(phone_clean) >= 9 and phone_clean.isdigit()
 
 # Initialize Supabase client
 try:
@@ -25,23 +43,48 @@ with tab1:
         
         if response.data:
             df = pd.DataFrame(response.data)
-            # Reorder columns for better display
-            columns = ['nome', 'email', 'telefone', 'created_at', 'id']
-            df = df[[col for col in columns if col in df.columns]]
+            
+            # Buscar secção de cada escuteiro (da tabela blocos_rifas)
+            escuteiro_seccoes = {}
+            for escuteiro in response.data:
+                esc_id = escuteiro['id']
+                blocos_response = supabase.table('blocos_rifas').select('seccao').eq('escuteiro_id', esc_id).limit(1).execute()
+                if blocos_response.data and blocos_response.data[0].get('seccao'):
+                    escuteiro_seccoes[esc_id] = blocos_response.data[0]['seccao']
+                else:
+                    escuteiro_seccoes[esc_id] = '-'
+            
+            # Adicionar coluna secção
+            df['seccao'] = df['id'].map(escuteiro_seccoes)
+            
+            # Formatar data
+            if 'created_at' in df.columns:
+                df['created_at'] = pd.to_datetime(df['created_at']).dt.strftime('%d-%m-%Y')
+            
+            # Criar coluna ID curto para visualização
+            if 'id' in df.columns:
+                df['id_curto'] = df['id'].str[:8] + '...'
+            
+            # Reordenar colunas
+            colunas_ordem = ['id_curto', 'nome', 'seccao', 'email', 'telefone', 'ativo', 'created_at']
+            df = df[[col for col in colunas_ordem if col in df.columns]]
             
             st.dataframe(
                 df,
                 column_config={
+                    "id": None,  # Ocultar ID completo
+                    "id_curto": "ID",
                     "nome": "Nome",
+                    "seccao": "Secção",
                     "email": "Email",
                     "telefone": "Telefone",
-                    "created_at": "Data de Registo",
-                    "id": "ID"
+                    "ativo": "Ativo",
+                    "created_at": "Data de Registo"
                 },
                 hide_index=True,
                 use_container_width=True
             )
-            st.info(f"Total de escuteiros: {len(df)}")
+            st.info(f"📊 Total de escuteiros: {len(df)}")
         else:
             st.info("Nenhum escuteiro registado ainda.")
     
@@ -89,12 +132,12 @@ with tab3:
         response = supabase.table('escuteiros').select('*').order('nome').execute()
         
         if response.data:
-            # Create a dictionary for scout selection
-            scouts_dict = {f"{scout['nome']} ({scout['id'][:8]}...)": scout for scout in response.data}
+            # Create a dictionary for scout selection (apenas nome, sem ID)
+            scouts_dict = {scout['nome']: scout for scout in response.data}
             
             selected_scout_name = st.selectbox(
                 "Selecione um escuteiro",
-                options=list(scouts_dict.keys())
+                options=sorted(scouts_dict.keys())
             )
             
             if selected_scout_name:

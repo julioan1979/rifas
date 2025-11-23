@@ -14,18 +14,52 @@ except ValueError as e:
     st.error(f"Erro ao conectar ao Supabase: {str(e)}")
     st.stop()
 
+# Get campaigns for filtering
+try:
+    campanhas_response = supabase.table('campanhas').select('*').order('created_at', desc='desc').execute()
+    
+    if campanhas_response.data:
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            campanhas_dict = {c['nome']: c for c in campanhas_response.data}
+            
+            # Set default to active campaign
+            default_idx = 0
+            for idx, c in enumerate(campanhas_response.data):
+                if c.get('ativa', False):
+                    default_idx = idx
+                    break
+            
+            selected_campanha_name = st.selectbox(
+                "🎯 Filtrar por Campanha",
+                options=list(campanhas_dict.keys()),
+                index=default_idx,
+                help="Selecione a campanha para visualizar/registar vendas"
+            )
+            selected_campanha = campanhas_dict[selected_campanha_name]
+        
+        with col2:
+            st.metric("", f"{'✅ Ativa' if selected_campanha.get('ativa') else '⏸️ Inativa'}")
+    else:
+        st.warning("⚠️ Nenhuma campanha criada. Crie uma campanha primeiro na página 'Campanhas'.")
+        st.stop()
+        
+except Exception as e:
+    st.error(f"Erro ao carregar campanhas: {str(e)}")
+    st.stop()
+
 # Tabs for different operations
 tab1, tab2, tab3 = st.tabs(["📋 Lista", "➕ Registar Venda", "✏️ Editar/Eliminar"])
 
 # Tab 1: List sales
 with tab1:
-    st.subheader("Lista de Vendas")
+    st.subheader(f"Vendas da Campanha: {selected_campanha['nome']}")
     
     try:
-        # Fetch sales with related data
+        # Fetch sales with related data filtered by campaign
         response = supabase.table('vendas').select(
-            '*, escuteiros(nome), blocos_rifas(nome, preco_unitario)'
-        ).order('data_venda', desc=True).execute()
+            '*, escuteiros(nome), blocos_rifas!inner(numero_inicial, numero_final, preco_unitario, campanha_id)'
+        ).eq('blocos_rifas.campanha_id', selected_campanha['id']).order('data_venda', desc=True).execute()
         
         if response.data:
             df = pd.DataFrame(response.data)
@@ -34,24 +68,34 @@ with tab1:
             if 'escuteiros' in df.columns:
                 df['escuteiro_nome'] = df['escuteiros'].apply(lambda x: x['nome'] if x else 'N/A')
             if 'blocos_rifas' in df.columns:
-                df['bloco_nome'] = df['blocos_rifas'].apply(lambda x: x['nome'] if x else 'N/A')
+                df['bloco_info'] = df['blocos_rifas'].apply(
+                    lambda x: f"Rifas {x['numero_inicial']}-{x['numero_final']}" if x and 'numero_inicial' in x else 'N/A'
+                )
             
-            # Select and reorder columns
-            display_cols = ['data_venda', 'escuteiro_nome', 'bloco_nome', 'quantidade', 'valor_total', 'id']
-            df_display = df[[col for col in display_cols if col in df.columns]]
+            # Formatar data (sem hora)
+            if 'data_venda' in df.columns:
+                df['data_venda'] = pd.to_datetime(df['data_venda']).dt.strftime('%d-%m-%Y')
+            
+            # Reordenar colunas para melhor visualização
+            colunas_ordem = ['data_venda', 'escuteiro_nome', 'bloco_info', 'quantidade', 'valor_total', 'observacoes']
+            df_display = df[[col for col in colunas_ordem if col in df.columns]]
             
             st.dataframe(
                 df_display,
                 column_config={
-                    "data_venda": "Data da Venda",
+                    "data_venda": "Data",
                     "escuteiro_nome": "Escuteiro",
-                    "bloco_nome": "Bloco de Rifas",
-                    "quantidade": "Quantidade",
+                    "bloco_info": "Bloco",
+                    "quantidade": st.column_config.NumberColumn(
+                        "Qtd",
+                        help="Quantidade de rifas vendidas"
+                    ),
                     "valor_total": st.column_config.NumberColumn(
                         "Valor Total",
-                        format="%.2f €"
+                        format="%.2f €",
+                        help="Valor total da venda (quantidade × preço unitário)"
                     ),
-                    "id": "ID"
+                    "observacoes": "Observações"
                 },
                 hide_index=True,
                 use_container_width=True
@@ -63,9 +107,9 @@ with tab1:
             total_valor = df['valor_total'].sum() if 'valor_total' in df.columns else 0
             
             col1, col2, col3 = st.columns(3)
-            col1.metric("Total de Vendas", total_vendas)
-            col2.metric("Total de Rifas Vendidas", int(total_rifas))
-            col3.metric("Valor Total", f"{total_valor:.2f} €")
+            col1.metric("📊 Total de Vendas", total_vendas)
+            col2.metric("🎟️ Total de Rifas Vendidas", int(total_rifas))
+            col3.metric("💰 Valor Total", f"{total_valor:.2f} €")
         else:
             st.info("Nenhuma venda registada ainda.")
     
@@ -78,8 +122,8 @@ with tab2:
     
     # Load scouts and blocks for selection
     try:
-        scouts_response = supabase.table('escuteiros').select('id, nome').order('nome').execute()
-        blocks_response = supabase.table('blocos_rifas').select('id, nome, preco_unitario').order('nome').execute()
+        scouts_response = supabase.table('escuteiros').select('id, nome').eq('ativo', True).order('nome').execute()
+        blocks_response = supabase.table('blocos_rifas').select('id, numero_inicial, numero_final, preco_unitario, escuteiro_id, escuteiros(nome)').eq('campanha_id', selected_campanha['id']).order('numero_inicial').execute()
         
         if not scouts_response.data:
             st.warning("⚠️ Não há escuteiros registados. Por favor, adicione escuteiros primeiro.")
@@ -89,17 +133,25 @@ with tab2:
             with st.form("add_sale_form"):
                 # Scout selection
                 scouts_dict = {scout['nome']: scout for scout in scouts_response.data}
+                
+                # Prepare blocks dict with better display
+                blocks_dict = {}
+                for block in blocks_response.data:
+                    escuteiro = block.get('escuteiros', {}).get('nome', 'Disponível') if block.get('escuteiros') else 'Disponível'
+                    display_name = f"Rifas {block['numero_inicial']}-{block['numero_final']} | {escuteiro}"
+                    blocks_dict[display_name] = block
                 selected_scout = st.selectbox(
                     "Escuteiro *",
-                    options=list(scouts_dict.keys())
+                    options=list(scouts_dict.keys()),
+                    help="Escuteiro que realizou a venda"
                 )
                 
-                # Block selection
-                blocks_dict = {block['nome']: block for block in blocks_response.data}
-                selected_block = st.selectbox(
+                selected_block_display = st.selectbox(
                     "Bloco de Rifas *",
-                    options=list(blocks_dict.keys())
+                    options=list(blocks_dict.keys()),
+                    help="Bloco de rifas vendido"
                 )
+                selected_block = blocks_dict[selected_block_display]
                 
                 # Quantity
                 quantidade = st.number_input(
@@ -111,7 +163,7 @@ with tab2:
                 
                 # Calculate total value
                 if selected_block:
-                    preco_unitario = float(blocks_dict[selected_block]['preco_unitario'])
+                    preco_unitario = float(selected_block['preco_unitario'])
                     valor_total = quantidade * preco_unitario
                     st.info(f"💶 Valor Total: **{valor_total:.2f} €** ({quantidade} × {preco_unitario:.2f} €)")
                 
@@ -129,7 +181,7 @@ with tab2:
                     else:
                         try:
                             scout_id = scouts_dict[selected_scout]['id']
-                            block_id = blocks_dict[selected_block]['id']
+                            block_id = selected_block['id']
                             
                             data = {
                                 "escuteiro_id": scout_id,
