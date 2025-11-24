@@ -33,7 +33,7 @@ The database should have the following tables in Supabase:
    - estado: TEXT (estado: 'disponivel', 'atribuido', 'vendido', 'devolvido')
    - created_at: TIMESTAMP
 
-4. vendas (sales)
+4. vendas (sales) - DEPRECATED: Use pagamentos diretos
    - id: UUID (primary key)
    - escuteiro_id: UUID (foreign key to escuteiros)
    - bloco_id: UUID (foreign key to blocos_rifas)
@@ -42,10 +42,14 @@ The database should have the following tables in Supabase:
    - data_venda: TIMESTAMP
    - observacoes: TEXT (notes)
    - created_at: TIMESTAMP
+   NOTE: Mantida apenas para compatibilidade com dados históricos.
+         Novos pagamentos devem usar bloco_id diretamente.
 
 5. pagamentos (payments)
    - id: UUID (primary key)
-   - venda_id: UUID (foreign key to vendas)
+   - venda_id: UUID (foreign key to vendas) - OPCIONAL (legado)
+   - bloco_id: UUID (foreign key to blocos_rifas) - NOVO FLUXO
+   - quantidade_rifas: INTEGER (number of tickets sold from block)
    - valor_pago: DECIMAL (amount paid)
    - data_pagamento: TIMESTAMP
    - metodo_pagamento: TEXT (payment method)
@@ -56,6 +60,7 @@ The database should have the following tables in Supabase:
    - data_entrega_canhotos: TIMESTAMP (stub delivery date)
    - observacoes_canhotos: TEXT (stub delivery notes)
    - created_at: TIMESTAMP
+   NOTE: Pagamentos podem ter venda_id (dados antigos) OU bloco_id (novo fluxo)
 
 6. devolucoes (returns)
    - id: UUID (primary key)
@@ -141,7 +146,9 @@ CREATE INDEX IF NOT EXISTS idx_vendas_data ON vendas(data_venda);
 -- Pagamentos table
 CREATE TABLE IF NOT EXISTS pagamentos (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    venda_id UUID REFERENCES vendas(id) ON DELETE CASCADE,
+    venda_id UUID REFERENCES vendas(id) ON DELETE CASCADE,  -- Optional (legacy data)
+    bloco_id UUID REFERENCES blocos_rifas(id) ON DELETE CASCADE,  -- New direct flow
+    quantidade_rifas INTEGER CHECK (quantidade_rifas >= 0),  -- Number of tickets sold from block
     valor_pago DECIMAL(10, 2) NOT NULL CHECK (valor_pago > 0),
     data_pagamento TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     metodo_pagamento TEXT DEFAULT 'Dinheiro',
@@ -151,11 +158,13 @@ CREATE TABLE IF NOT EXISTS pagamentos (
     canhotos_esperados INTEGER CHECK (canhotos_esperados >= 0),
     data_entrega_canhotos TIMESTAMP WITH TIME ZONE,
     observacoes_canhotos TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT check_venda_ou_bloco CHECK (venda_id IS NOT NULL OR bloco_id IS NOT NULL)
 );
 
 -- Create indexes
 CREATE INDEX IF NOT EXISTS idx_pagamentos_venda ON pagamentos(venda_id);
+CREATE INDEX IF NOT EXISTS idx_pagamentos_bloco ON pagamentos(bloco_id);
 CREATE INDEX IF NOT EXISTS idx_pagamentos_data ON pagamentos(data_pagamento);
 CREATE INDEX IF NOT EXISTS idx_pagamentos_canhotos_status ON pagamentos(canhotos_entregues, canhotos_esperados);
 
