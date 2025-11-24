@@ -87,6 +87,8 @@ Acesse: http://localhost:8501
 3. **Registar Vendas** → Página "💰 Vendas"
 4. **Controlar Pagamentos** → Página "💳 Pagamentos"
 
+> **Nota (2025-11-24):** O fluxo oficial de pagamentos passou a ser **Escuteiro → Organização**. As páginas relacionadas com pagamentos comprador→escuteiro foram descontinuadas temporariamente; consulte `docs/MIGRATION_PAYMENTS.md` para o procedimento de migração e consolidação.
+
 ## 🎯 Funcionalidades Principais
 
 - ✅ Gestão completa de escuteiros

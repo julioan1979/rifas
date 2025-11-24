@@ -1,18 +1,19 @@
+# Página descontinuada: Pagamentos comprador→escuteiro
 import streamlit as st
-import pandas as pd
-from datetime import datetime
-from utils.supabase_client import get_supabase_client
 
-st.set_page_config(page_title="Pagamentos", page_icon="💳", layout="wide")
+st.set_page_config(page_title="Pagamentos (Descontinuado)", page_icon="💳", layout="wide")
 
-st.title("💳 Gestão de Pagamentos")
+st.title("💳 Pagamentos — Descontinuado")
 
-# Initialize Supabase client
-try:
-    supabase = get_supabase_client()
-except ValueError as e:
-    st.error(f"Erro ao conectar ao Supabase: {str(e)}")
-    st.stop()
+st.warning(
+    "A funcionalidade de registo de pagamentos comprador→escuteiro foi descontinuada.\n"
+    "O fluxo oficial agora é: Escuteiro → Organização.\n\n"
+    "Consulte o README e `docs/MIGRATION_PAYMENTS.md` para o processo de consolidação e as instruções para conciliação.`"
+)
+
+st.info("Se precisa de auditar ou migrar os dados históricos, utilize o script em `scripts/consolidar_pagamentos_para_blocos.sql` em ambiente de staging.")
+
+st.stop()
 
 # Get campaigns for filtering
 try:

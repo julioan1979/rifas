@@ -1,34 +1,19 @@
+# Página descontinuada temporariamente: Controle de Escuteiros
 import streamlit as st
-import pandas as pd
-from datetime import datetime
-from utils.supabase_client import get_supabase_client
 
-st.set_page_config(page_title="Controle de Escuteiros", page_icon="💵", layout="wide")
+st.set_page_config(page_title="Controle de Escuteiros (Descontinuado)", page_icon="💵", layout="wide")
 
-st.title("💵 Controle de Pagamentos e Canhotos")
+st.title("💵 Controle de Pagamentos e Canhotos — Temporariamente Descontinuado")
 
-st.success("""
-✅ **Esta é a página correta para registar:**
-- 💰 Pagamentos dos escuteiros à organização (pelos blocos vendidos)
-- 📋 Devolução de canhotos das rifas vendidas
-""")
+st.warning(
+    "A funcionalidade de conciliação foi consolidada na nova política: Fluxo oficial é Escuteiro → Organização.\n"
+    "Durante a transição, por favor utilize as ferramentas de auditoria e o script de consolidação em `scripts/consolidar_pagamentos_para_blocos.sql`.\n\n"
+    "Consulte `docs/MIGRATION_PAYMENTS.md` para instruções detalhadas."
+)
 
-st.info("""
-📋 **Fluxo de Trabalho:**
-1. Escuteiro recebe bloco de rifas atribuído
-2. Escuteiro vende as rifas aos compradores
-3. **Escuteiro paga o dinheiro** à organização (registar aqui)
-4. **Escuteiro devolve os canhotos** das rifas vendidas (registar aqui)
-""")
+st.info("Esta página está temporariamente desativada para prevenir duplicação de registos. Veja docs para migrar dados históricos.")
 
-st.divider()
-
-# Initialize Supabase client
-try:
-    supabase = get_supabase_client()
-except ValueError as e:
-    st.error(f"Erro ao conectar ao Supabase: {str(e)}")
-    st.stop()
+st.stop()
 
 # Get campaigns for filtering
 try:
