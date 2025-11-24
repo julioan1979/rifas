@@ -1,22 +1,6 @@
-# 📊 Setup da Base de Dados - Supabase
-
-Este guia mostra como configurar todas as tabelas necessárias no Supabase.
-
-## ⚡ Configuração Rápida
-
-### 1. Aceder ao SQL Editor
-
-1. Abra o seu projeto no [Supabase](https://app.supabase.com)
-2. No menu lateral, clique em **SQL Editor**
-3. Clique em **+ New Query**
-
-### 2. Executar o SQL Completo
-
-Copie e cole **TODO** o código SQL abaixo no editor e clique em **RUN** (ou F5):
-
-```sql
 -- ============================================
 -- SISTEMA DE GESTÃO DE RIFAS - SETUP COMPLETO
+-- Script atualizado com tabela campanhas
 -- ============================================
 
 -- Enable UUID extension
@@ -187,198 +171,41 @@ SELECT
 FROM blocos_rifas
 GROUP BY estado;
 
+-- View: Resumo de blocos por campanha
+CREATE OR REPLACE VIEW vw_blocos_por_campanha AS
+SELECT 
+    c.id as campanha_id,
+    c.nome as campanha_nome,
+    c.ativa as campanha_ativa,
+    COUNT(b.id) as total_blocos,
+    SUM(b.numero_final - b.numero_inicial + 1) as total_rifas,
+    COUNT(CASE WHEN b.estado = 'atribuido' THEN 1 END) as blocos_atribuidos,
+    COUNT(CASE WHEN b.estado = 'vendido' THEN 1 END) as blocos_vendidos,
+    COUNT(CASE WHEN b.estado = 'disponivel' THEN 1 END) as blocos_disponiveis,
+    COUNT(CASE WHEN b.estado = 'devolvido' THEN 1 END) as blocos_devolvidos
+FROM campanhas c
+LEFT JOIN blocos_rifas b ON c.id = b.campanha_id
+GROUP BY c.id, c.nome, c.ativa;
+
+-- View: Resumo de vendas por campanha
+CREATE OR REPLACE VIEW vw_vendas_por_campanha AS
+SELECT 
+    c.id as campanha_id,
+    c.nome as campanha_nome,
+    COUNT(DISTINCT v.id) as total_vendas,
+    COALESCE(SUM(v.quantidade), 0) as total_rifas_vendidas,
+    COALESCE(SUM(v.valor_total), 0) as valor_total_vendas,
+    COALESCE(SUM(p.valor_pago), 0) as total_pago,
+    COALESCE(SUM(v.valor_total) - SUM(p.valor_pago), 0) as saldo_pendente
+FROM campanhas c
+LEFT JOIN blocos_rifas b ON c.id = b.campanha_id
+LEFT JOIN vendas v ON b.id = v.bloco_id
+LEFT JOIN pagamentos p ON v.id = p.venda_id
+GROUP BY c.id, c.nome;
+
 -- ============================================
 -- CONFIRMAÇÃO
 -- ============================================
-SELECT 'Setup concluído com sucesso! ✅' as status;
-```
-
-### 3. Verificar Resultados
-
-Deve ver a mensagem: **"Setup concluído com sucesso! ✅"**
-
-## ✅ Verificação das Tabelas
-
-Para confirmar que tudo foi criado corretamente, execute:
-
-```sql
--- Verificar tabelas criadas
-SELECT table_name 
-FROM information_schema.tables 
-WHERE table_schema = 'public' 
-ORDER BY table_name;
-```
-
-Deve ver:
-- ✅ `campanhas`
-- ✅ `blocos_rifas`
-- ✅ `devolucoes`
-- ✅ `escuteiros`
-- ✅ `pagamentos`
-- ✅ `vendas`
-
-## 📊 Estrutura das Tabelas
-
-### campanhas
-| Coluna | Tipo | Descrição |
-|--------|------|-----------|
-| id | UUID | ID único (chave primária) |
-| nome | TEXT | Nome da campanha (único) |
-| descricao | TEXT | Descrição (opcional) |
-| data_inicio | DATE | Data de início |
-| data_fim | DATE | Data de fim |
-| ativa | BOOLEAN | Campanha ativa? |
-| created_at | TIMESTAMP | Data de criação |
-
-### escuteiros
-| Coluna | Tipo | Descrição |
-|--------|------|-----------|
-| id | UUID | ID único (chave primária) |
-| nome | TEXT | Nome do escuteiro |
-| email | TEXT | Email (opcional) |
-| telefone | TEXT | Telefone (opcional) |
-| ativo | BOOLEAN | Escuteiro ativo? |
-| created_at | TIMESTAMP | Data de criação |
-
-### blocos_rifas
-| Coluna | Tipo | Descrição |
-|--------|------|-----------|
-| id | UUID | ID único |
-| campanha_id | UUID | ID da campanha (FK) |
-| nome | TEXT | Nome do bloco |
-| numero_inicial | INTEGER | Número inicial |
-| numero_final | INTEGER | Número final |
-| preco_unitario | DECIMAL | Preço por rifa |
-| escuteiro_id | UUID | ID do escuteiro atribuído |
-| seccao | TEXT | Secção (Reserva, Lobitos, etc.) |
-| data_atribuicao | TIMESTAMP | Data de atribuição |
-| estado | TEXT | disponivel/atribuido/vendido/devolvido |
-| created_at | TIMESTAMP | Data de criação |
-
-### vendas
-| Coluna | Tipo | Descrição |
-|--------|------|-----------|
-| id | UUID | ID único |
-| escuteiro_id | UUID | ID do escuteiro |
-| bloco_id | UUID | ID do bloco |
-| quantidade | INTEGER | Quantidade vendida |
-| valor_total | DECIMAL | Valor total |
-| data_venda | TIMESTAMP | Data da venda |
-| observacoes | TEXT | Observações |
-| created_at | TIMESTAMP | Data de criação |
-
-### pagamentos
-| Coluna | Tipo | Descrição |
-|--------|------|-----------|
-| id | UUID | ID único |
-| venda_id | UUID | ID da venda |
-| valor_pago | DECIMAL | Valor pago |
-| data_pagamento | TIMESTAMP | Data do pagamento |
-| metodo_pagamento | TEXT | Método de pagamento |
-| referencia | TEXT | Referência |
-| observacoes | TEXT | Observações |
-| created_at | TIMESTAMP | Data de criação |
-
-### devolucoes
-| Coluna | Tipo | Descrição |
-|--------|------|-----------|
-| id | UUID | ID único |
-| escuteiro_id | UUID | ID do escuteiro |
-| bloco_id | UUID | ID do bloco |
-| quantidade | INTEGER | Quantidade devolvida |
-| motivo | TEXT | Motivo da devolução |
-| data_devolucao | TIMESTAMP | Data da devolução |
-| created_at | TIMESTAMP | Data de criação |
-
-## 🔄 Adicionar Dados de Teste (Opcional)
-
-Se quiser adicionar alguns dados de exemplo para testar:
-
-```sql
--- Adicionar campanha de teste
-INSERT INTO campanhas (nome, descricao, data_inicio, data_fim, ativa) VALUES
-('Natal2025', 'Campanha de Natal 2025', '2025-11-01', '2025-12-24', true);
-
--- Adicionar escuteiros de teste
-INSERT INTO escuteiros (nome, email, telefone, ativo) VALUES
-('João Silva', 'joao@example.com', '912345678', true),
-('Maria Santos', 'maria@example.com', '913456789', true),
-('Pedro Costa', 'pedro@example.com', '914567890', true);
-
--- Obter ID da campanha (necessário para criar blocos)
--- Nota: Substitua '<campanha_id>' pelo ID real retornado da query acima
--- Ou use: SELECT id FROM campanhas WHERE nome = 'Natal2025';
-
--- Adicionar blocos de rifas de teste
--- Exemplo assumindo que já tem o campanha_id
-INSERT INTO blocos_rifas (campanha_id, nome, numero_inicial, numero_final, preco_unitario, seccao, estado) 
-SELECT 
-    (SELECT id FROM campanhas WHERE nome = 'Natal2025'),
-    'Bloco A', 1, 100, 1.00, 'Lobitos', 'disponivel'
-UNION ALL SELECT 
-    (SELECT id FROM campanhas WHERE nome = 'Natal2025'),
-    'Bloco B', 101, 200, 1.00, 'Exploradores', 'disponivel'
-UNION ALL SELECT 
-    (SELECT id FROM campanhas WHERE nome = 'Natal2025'),
-    'Bloco C', 201, 300, 1.50, 'Pioneiros', 'disponivel';
-
--- Verificar dados inseridos
-SELECT * FROM campanhas;
-SELECT * FROM escuteiros;
-SELECT * FROM blocos_rifas;
-```
-
-## 🔒 Segurança em Produção
-
-⚠️ **IMPORTANTE:** As políticas RLS atuais são permissivas para desenvolvimento.
-
-Para produção, considere:
-
-1. **Implementar autenticação de utilizadores**
-2. **Restringir acessos por perfil** (admin, escuteiro, etc.)
-3. **Criar políticas RLS específicas:**
-
-```sql
--- Exemplo: Apenas utilizadores autenticados
-DROP POLICY IF EXISTS "Enable read for authenticated" ON escuteiros;
-CREATE POLICY "Enable read for authenticated" 
-ON escuteiros FOR SELECT 
-USING (auth.role() = 'authenticated');
-
--- Exemplo: Apenas admins podem inserir
-DROP POLICY IF EXISTS "Enable insert for admins" ON escuteiros;
-CREATE POLICY "Enable insert for admins" 
-ON escuteiros FOR INSERT 
-WITH CHECK (auth.jwt() ->> 'role' = 'admin');
-```
-
-## ❓ Problemas Comuns
-
-### Erro: "permission denied for schema public"
-**Solução:** Verifique se está a usar o SQL Editor com permissões de admin do projeto.
-
-### Erro: "relation already exists"
-**Solução:** As tabelas já existem. Para recriar, primeiro apague:
-```sql
-DROP TABLE IF EXISTS devolucoes CASCADE;
-DROP TABLE IF EXISTS pagamentos CASCADE;
-DROP TABLE IF EXISTS vendas CASCADE;
-DROP TABLE IF EXISTS blocos_rifas CASCADE;
-DROP TABLE IF EXISTS escuteiros CASCADE;
-DROP TABLE IF EXISTS campanhas CASCADE;
-```
-
-### Erro ao criar views
-**Solução:** Certifique-se que todas as tabelas foram criadas primeiro.
-
-## 📚 Próximos Passos
-
-Após setup da base de dados:
-
-1. ✅ Configure as credenciais na aplicação (`.env` ou Streamlit Secrets)
-2. ✅ Execute `streamlit run app.py`
-3. ✅ Comece a usar o sistema!
-
----
-
-**📌 Nota:** Guarde este ficheiro para referência futura ou caso precise recriar a base de dados.
+SELECT 'Setup completo concluído com sucesso! ✅' as status;
+SELECT 'Tabelas criadas: campanhas, escuteiros, blocos_rifas, vendas, pagamentos, devolucoes' as tabelas;
+SELECT 'Views criadas: vw_vendas_por_escuteiro, vw_blocos_status, vw_blocos_por_campanha, vw_vendas_por_campanha' as views;
