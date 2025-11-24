@@ -116,12 +116,13 @@ rifas/
 - Preenchem canhotos com dados do comprador
 
 ### 4. Registar Pagamento e Canhotos
-- Aceda a **💵 Controle Escuteiros**
-- Registar quando escuteiro paga dinheiro
-- Registar quando devolve canhotos
 
-### 5. Acompanhar Status
-- Dashboard mostra métricas em tempo real
+### Nota Importante (2025-11-24)
+- Fluxo oficial de pagamentos do sistema agora é: **Escuteiro → Organização**.
+- Os registos do fluxo "comprador → escuteiro" foram considerados inadequados para o nosso processo e foram arquivados para auditoria; não são usados como fonte ativa.
+- Operadores devem registar apenas a entrega de dinheiro pelo escuteiro e a devolução dos canhotos (campos em `blocos_rifas`).
+- As páginas e scripts que registam pagamentos de comprador→escuteiro foram descontinuados: consulte `docs/MIGRATION_PAYMENTS.md` e `scripts/consolidar_pagamentos_para_blocos.sql` para o procedimento de consolidação e migração.
+
 - Status visual: ✅ Pago, ⏳ Pendente, ❌ Em falta
 
 ## 🗄️ Base de Dados
