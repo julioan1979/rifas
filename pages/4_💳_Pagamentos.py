@@ -15,7 +15,7 @@ except Exception as e:
 
 st.title("💳 Gestão de Pagamentos")
 
-st.info("Esta página regista pagamentos de **vendas** (quando compradores pagam pelas rifas adquiridas).")
+st.info("Esta página regista **prestações de contas** dos escuteiros (quando os escuteiros entregam o dinheiro das rifas vendidas à organização).")
 
 # Get campaigns for filtering
 try:
@@ -130,9 +130,10 @@ with tab2:
     st.subheader("Registar Novo Pagamento")
     
     st.info("""
-    **Atenção:** Esta página regista pagamentos de **vendas individuais** (comprador paga ao escuteiro).
-    
-    Para registar pagamentos do **escuteiro à organização**, use a página **💵 Controle Escuteiros**.
+    **Como funciona:**
+    - Escuteiros recebem blocos de rifas para vender
+    - Quando vendem, devem **prestar contas** e entregar o dinheiro
+    - Esta página regista quando o **escuteiro paga/entrega** o valor das vendas realizadas
     """)
     
     # Load sales for selection
