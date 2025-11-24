@@ -80,12 +80,28 @@ with tab1:
                     lambda x: x.get('valor_total', 0) if x else 0
                 )
             
+            # Adicionar coluna de status de canhotos
+            def formatar_canhotos(row):
+                entregues = row.get('canhotos_entregues', 0) or 0
+                esperados = row.get('canhotos_esperados', 0) or 0
+                
+                if esperados == 0:
+                    return "N/A"
+                elif entregues == esperados:
+                    return f"{entregues}/{esperados} ✅"
+                elif entregues > 0:
+                    return f"{entregues}/{esperados} ⚠️"
+                else:
+                    return f"{entregues}/{esperados} ❌"
+            
+            df['status_canhotos'] = df.apply(formatar_canhotos, axis=1)
+            
             # Formatar data (sem hora)
             if 'data_pagamento' in df.columns:
                 df['data_pagamento'] = pd.to_datetime(df['data_pagamento']).dt.strftime('%d-%m-%Y')
             
             # Reordenar colunas para melhor visualização
-            colunas_ordem = ['data_pagamento', 'escuteiro_nome', 'bloco_info', 'valor_pago', 'valor_venda', 'metodo_pagamento', 'referencia', 'observacoes']
+            colunas_ordem = ['data_pagamento', 'escuteiro_nome', 'bloco_info', 'valor_pago', 'valor_venda', 'status_canhotos', 'metodo_pagamento', 'referencia', 'observacoes']
             df_display = df[[col for col in colunas_ordem if col in df.columns]]
             
             st.dataframe(
@@ -104,6 +120,10 @@ with tab1:
                         format="%.2f €",
                         help="Valor total da venda. Se diferente do Valor Pago, há saldo pendente."
                     ),
+                    "status_canhotos": st.column_config.TextColumn(
+                        "Canhotos",
+                        help="Status de entrega dos canhotos: ✅ Completo | ⚠️ Parcial | ❌ Não entregue"
+                    ),
                     "metodo_pagamento": "Método",
                     "referencia": "Referência",
                     "observacoes": "Observações"
@@ -115,10 +135,16 @@ with tab1:
             # Statistics
             total_pagamentos = len(df)
             total_pago = df['valor_pago'].sum() if 'valor_pago' in df.columns else 0
+            total_canhotos_esperados = df['canhotos_esperados'].sum() if 'canhotos_esperados' in df.columns else 0
+            total_canhotos_entregues = df['canhotos_entregues'].sum() if 'canhotos_entregues' in df.columns else 0
             
-            col1, col2 = st.columns(2)
+            col1, col2, col3, col4 = st.columns(4)
             col1.metric("📊 Total de Pagamentos", total_pagamentos)
             col2.metric("💰 Valor Total Recebido", f"{total_pago:.2f} €")
+            col3.metric("📄 Canhotos Entregues", f"{total_canhotos_entregues}/{total_canhotos_esperados}")
+            if total_canhotos_esperados > 0:
+                perc_canhotos = (total_canhotos_entregues / total_canhotos_esperados) * 100
+                col4.metric("✅ Taxa de Entrega", f"{perc_canhotos:.1f}%")
         else:
             st.info("Nenhum pagamento registado ainda.")
     
@@ -213,6 +239,7 @@ with tab2:
                 if selected_sale_label:
                     selected_sale, saldo_pendente = sales_dict[selected_sale_label]
                     valor_total = float(selected_sale['valor_total'])
+                    quantidade_vendida = selected_sale.get('quantidade', 0)
                     
                     if saldo_pendente > 0.01:
                         st.info(f"💶 Valor da Venda: **{valor_total:.2f} €** | Saldo Pendente: **{saldo_pendente:.2f} €**")
@@ -242,6 +269,37 @@ with tab2:
                         value=datetime.now()
                     )
                     
+                    # Stub control section
+                    st.divider()
+                    st.subheader("📄 Controlo de Canhotos")
+                    
+                    # Show expected stubs
+                    st.info(f"📋 **Rifas vendidas:** {quantidade_vendida} | **Canhotos esperados:** {quantidade_vendida}")
+                    
+                    # Number of stubs delivered
+                    canhotos_entregues = st.number_input(
+                        "Canhotos Entregues",
+                        min_value=0,
+                        max_value=quantidade_vendida,
+                        value=0,
+                        help="Quantos canhotos o escuteiro entregou nesta prestação de contas"
+                    )
+                    
+                    # Visual feedback
+                    if canhotos_entregues == quantidade_vendida:
+                        st.success(f"✅ Todos os {quantidade_vendida} canhotos serão marcados como entregues")
+                    elif canhotos_entregues > 0:
+                        st.warning(f"⚠️ Entrega parcial: {canhotos_entregues}/{quantidade_vendida} canhotos")
+                    else:
+                        st.error(f"❌ Nenhum canhoto será registado como entregue")
+                    
+                    # Optional notes about stubs
+                    observacoes_canhotos = st.text_area(
+                        "Observações sobre Canhotos (opcional)",
+                        placeholder="Ex: Faltam 3 canhotos, prometeu entregar na próxima semana",
+                        help="Use este campo para registar informações sobre canhotos em falta ou outras observações"
+                    )
+                    
                     submitted = st.form_submit_button("Registar Pagamento", type="primary")
                     
                     if submitted:
@@ -250,13 +308,19 @@ with tab2:
                                 "venda_id": selected_sale['id'],
                                 "valor_pago": valor_pago,
                                 "data_pagamento": data_pagamento.isoformat(),
-                                "metodo_pagamento": metodo_pagamento
+                                "metodo_pagamento": metodo_pagamento,
+                                "canhotos_entregues": canhotos_entregues,
+                                "canhotos_esperados": quantidade_vendida,
+                                "data_entrega_canhotos": datetime.now().isoformat() if canhotos_entregues > 0 else None,
+                                "observacoes_canhotos": observacoes_canhotos if observacoes_canhotos else None
                             }
                             
                             response = supabase.table('pagamentos').insert(data).execute()
                             
                             if response.data:
                                 st.success(f"✅ Pagamento de {valor_pago:.2f} € registado com sucesso!")
+                                if canhotos_entregues > 0:
+                                    st.success(f"📄 {canhotos_entregues} canhotos registados como entregues")
                                 st.rerun()
                             else:
                                 st.error("Erro ao registar pagamento.")
@@ -359,6 +423,42 @@ with tab3:
                             value=current_date
                         )
                         
+                        # Stub control section
+                        st.divider()
+                        st.subheader("📄 Controlo de Canhotos")
+                        
+                        # Get the selected sale to know expected stubs
+                        selected_sale = sales_dict[new_sale_label]
+                        quantidade_vendida = selected_sale.get('quantidade', 0)
+                        
+                        st.info(f"📋 **Rifas vendidas:** {quantidade_vendida} | **Canhotos esperados:** {quantidade_vendida}")
+                        
+                        # Number of stubs delivered
+                        current_canhotos_entregues = payment.get('canhotos_entregues', 0) or 0
+                        new_canhotos_entregues = st.number_input(
+                            "Canhotos Entregues",
+                            min_value=0,
+                            max_value=quantidade_vendida,
+                            value=current_canhotos_entregues,
+                            help="Quantos canhotos o escuteiro entregou"
+                        )
+                        
+                        # Visual feedback
+                        if new_canhotos_entregues == quantidade_vendida:
+                            st.success(f"✅ Todos os {quantidade_vendida} canhotos marcados como entregues")
+                        elif new_canhotos_entregues > 0:
+                            st.warning(f"⚠️ Entrega parcial: {new_canhotos_entregues}/{quantidade_vendida} canhotos")
+                        else:
+                            st.error(f"❌ Nenhum canhoto registado como entregue")
+                        
+                        # Optional notes about stubs
+                        current_obs_canhotos = payment.get('observacoes_canhotos', '') or ''
+                        new_observacoes_canhotos = st.text_area(
+                            "Observações sobre Canhotos (opcional)",
+                            value=current_obs_canhotos,
+                            placeholder="Ex: Faltam 3 canhotos, prometeu entregar na próxima semana"
+                        )
+                        
                         update_submitted = st.form_submit_button("Atualizar", type="primary")
                         
                         if update_submitted:
@@ -367,7 +467,11 @@ with tab3:
                                     "venda_id": sales_dict[new_sale_label]['id'],
                                     "valor_pago": new_valor_pago,
                                     "data_pagamento": new_data_pagamento.isoformat(),
-                                    "metodo_pagamento": new_metodo_pagamento
+                                    "metodo_pagamento": new_metodo_pagamento,
+                                    "canhotos_entregues": new_canhotos_entregues,
+                                    "canhotos_esperados": quantidade_vendida,
+                                    "data_entrega_canhotos": datetime.now().isoformat() if new_canhotos_entregues > 0 else None,
+                                    "observacoes_canhotos": new_observacoes_canhotos if new_observacoes_canhotos else None
                                 }
                                 
                                 response = supabase.table('pagamentos').update(update_data).eq('id', payment['id']).execute()

@@ -51,6 +51,10 @@ The database should have the following tables in Supabase:
    - metodo_pagamento: TEXT (payment method)
    - referencia: TEXT (payment reference)
    - observacoes: TEXT (notes)
+   - canhotos_entregues: INTEGER (number of stubs delivered)
+   - canhotos_esperados: INTEGER (number of stubs expected)
+   - data_entrega_canhotos: TIMESTAMP (stub delivery date)
+   - observacoes_canhotos: TEXT (stub delivery notes)
    - created_at: TIMESTAMP
 
 6. devolucoes (returns)
@@ -143,12 +147,17 @@ CREATE TABLE IF NOT EXISTS pagamentos (
     metodo_pagamento TEXT DEFAULT 'Dinheiro',
     referencia TEXT,
     observacoes TEXT,
+    canhotos_entregues INTEGER DEFAULT 0 CHECK (canhotos_entregues >= 0),
+    canhotos_esperados INTEGER CHECK (canhotos_esperados >= 0),
+    data_entrega_canhotos TIMESTAMP WITH TIME ZONE,
+    observacoes_canhotos TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Create indexes
 CREATE INDEX IF NOT EXISTS idx_pagamentos_venda ON pagamentos(venda_id);
 CREATE INDEX IF NOT EXISTS idx_pagamentos_data ON pagamentos(data_pagamento);
+CREATE INDEX IF NOT EXISTS idx_pagamentos_canhotos_status ON pagamentos(canhotos_entregues, canhotos_esperados);
 
 -- Devolucoes table
 CREATE TABLE IF NOT EXISTS devolucoes (
