@@ -28,12 +28,11 @@ Sistema completo desenvolvido em **Streamlit** com backend **Supabase** para ger
 - 🔒 Prevenção de reatribuição de blocos já atribuídos
 - 📊 3 tabs: Lista, Reservar por Secção, Atribuir a Escuteiro
 
-### 💵 Controle Financeiro Completo
-- 💰 **Pagamentos:** Escuteiro → Organização
-- 📋 **Canhotos:** Controle de devolução
-- 📊 Dashboard com status visual
-- ✅ Rastreamento individual por bloco
-- 📅 Datas de pagamento e devolução
+### 💰 Vendas e Pagamentos
+- 📝 **Vendas:** Registro de vendas por bloco
+- 💳 **Pagamentos:** Controle de pagamentos das vendas
+- 🔄 **Devoluções:** Gestão de devoluções
+- 📊 Relatórios consolidados por escuteiro e campanha
 
 ## 🚀 Deploy no Streamlit Cloud
 
@@ -83,18 +82,18 @@ rifas/
 ├── requirements.txt                # Dependências
 ├── pages/                          # Páginas da aplicação
 │   ├── 1_👥_Escuteiros.py         # Gestão de escuteiros
-│   ├── 2_🎟️_Blocos_de_Rifas.py   # Gestão de blocos (3 tabs)
+│   ├── 2_🎟️_Blocos_de_Rifas.py   # Gestão de blocos
 │   ├── 3_💰_Vendas.py             # Registro de vendas
 │   ├── 4_💳_Pagamentos.py         # Pagamentos
 │   ├── 5_🔄_Devoluções.py         # Devoluções
-│   ├── 6_💵_Controle_Escuteiros.py # Controle financeiro
 │   └── 7_📅_Campanhas.py          # Gestão de campanhas
 ├── utils/
 │   ├── supabase_client.py         # Cliente Supabase
 │   └── database_schema.py         # Schema SQL
 ├── scripts/                        # Scripts utilitários
-│   ├── limpar_base_dados.py       # Limpeza da BD
-│   └── importar_natal_2025_corrigido.py # Importação
+│   ├── setup_completo_supabase.sql           # Setup completo DB
+│   ├── verificar_e_ajustar_supabase.py       # Verificação
+│   └── limpar_campos_extras_blocos.sql       # Limpeza
 └── .streamlit/
     └── config.toml                 # Configuração
 ```
@@ -115,47 +114,45 @@ rifas/
 - Escuteiros vendem rifas aos compradores
 - Preenchem canhotos com dados do comprador
 
-### 4. Registar Pagamento e Canhotos
-
-### Nota Importante (2025-11-24)
-- Fluxo oficial de pagamentos do sistema agora é: **Escuteiro → Organização**.
-- Os registos do fluxo "comprador → escuteiro" foram considerados inadequados para o nosso processo e foram arquivados para auditoria; não são usados como fonte ativa.
-- Operadores devem registar apenas a entrega de dinheiro pelo escuteiro e a devolução dos canhotos (campos em `blocos_rifas`).
-- As páginas e scripts que registam pagamentos de comprador→escuteiro foram descontinuados: consulte `docs/MIGRATION_PAYMENTS.md` e `scripts/consolidar_pagamentos_para_blocos.sql` para o procedimento de consolidação e migração.
-
-- Status visual: ✅ Pago, ⏳ Pendente, ❌ Em falta
+### 4. Registar Vendas e Pagamentos
+- **Tab 3 - Vendas:** Registar vendas por bloco e escuteiro
+- **Tab 4 - Pagamentos:** Registar pagamentos das vendas
+- Status consolidado por escuteiro e campanha
 
 ## 🗄️ Base de Dados
 
 ### Tabelas Principais
 - `campanhas` - Campanhas de rifas
 - `escuteiros` - Cadastro de escuteiros
-- `blocos_rifas` - Blocos com controle completo
-- `vendas` - Registro de vendas
-- `pagamentos` - Pagamentos
-- `devolucoes` - Devoluções
+- `blocos_rifas` - Blocos de rifas (com campanha_id e seccao)
+- `vendas` - Registro de vendas por bloco
+- `pagamentos` - Pagamentos das vendas
+- `devolucoes` - Devoluções de blocos
 
-### Colunas de Controle (blocos_rifas)
-- `valor_a_pagar`, `valor_pago` - Controle financeiro
-- `rifas_vendidas`, `canhotos_devolvidos` - Status
-- `data_pagamento`, `data_devolucao_canhotos` - Datas
-- `observacoes_pagamento`, `observacoes_canhotos` - Notas
+### Campos Importantes
+- `blocos_rifas.campanha_id` - Relacionamento com campanha
+- `blocos_rifas.seccao` - Secção do bloco (Lobitos, Exploradores, etc)
+- `blocos_rifas.escuteiro_id` - Escuteiro atribuído ao bloco
+- `blocos_rifas.estado` - Estado: disponivel, atribuido, vendido, devolvido
 
 ## 🛠️ Scripts Utilitários
 
-### Limpar Base de Dados
+### Verificar Estrutura do Supabase
 ```bash
-python scripts/limpar_base_dados.py
+python scripts/verificar_e_ajustar_supabase.py
 ```
-⚠️ **ATENÇÃO:** Apaga todos os dados!
+✅ Verifica todas as tabelas e campos
+✅ Identifica campos extras ou faltantes
+✅ Gera SQL de ajuste se necessário
 
-### Importar Dados
+### Executar Setup Completo
+No Supabase SQL Editor, execute:
 ```bash
-python scripts/importar_natal_2025_corrigido.py
+# Conteúdo do arquivo: scripts/setup_completo_supabase.sql
 ```
-✅ Importa escuteiros únicos, sem duplicados
-✅ Identifica relações de irmãos
-✅ Cria blocos e atribuições
+✅ Cria todas as tabelas
+✅ Configura índices e políticas RLS
+✅ Cria views para relatórios
 
 ## 🔧 Tecnologias
 
@@ -179,13 +176,13 @@ MIT License - Ver arquivo `LICENSE`
 ### Prevenção de Duplicação
 - Filtro `.is_('escuteiro_id', 'null')` mostra apenas blocos não atribuídos
 - Impossível reatribuir bloco já atribuído
-- Escuteiros únicos na importação
+- Escuteiros únicos (sem duplicados)
 
-### Controle Completo
-- Pagamento: Escuteiro → Organização
-- Canhotos: Rifas vendidas devolvidas
-- Status visual em tempo real
-- Dashboard com métricas consolidadas
+### Gestão por Campanha
+- Múltiplas campanhas simultâneas
+- Filtros por campanha em todas as páginas
+- Relatórios consolidados por campanha
+- Dashboard com métricas por campanha
 
 ---
 
