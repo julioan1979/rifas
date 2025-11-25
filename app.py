@@ -73,16 +73,16 @@ with st.expander("ℹ️ Sobre o Sistema", expanded=False):
 
     - **👥 Escuteiros**: Gerir escuteiros que vendem rifas (criar, editar, visualizar)
     - **🎟️ Blocos de Rifas**: Criar e atribuir blocos de rifas aos escuteiros
-    - **💰 Vendas**: Registar vendas de rifas e acompanhar o progresso
-    - **💳 Pagamentos**: Controlar pagamentos recebidos e saldos pendentes
+    - **📦 Recebimento**: Registar canhotos e dinheiro recebidos dos escuteiros
+    - **🔄 Devoluções**: Gerir devoluções de blocos (total ou parcial)
 
-    ### 🚀 Como começar:
+    ### 🚀 Como funciona:
 
     1. **Registar Escuteiros**: Comece por adicionar os escuteiros na página "👥 Escuteiros"
-    2. **Criar Blocos**: Crie blocos de rifas na página "🎟️ Blocos de Rifas"
-    3. **Atribuir Blocos**: Atribua blocos aos escuteiros
-    4. **Registar Vendas**: Registe as vendas na página "💰 Vendas"
-    5. **Controlar Pagamentos**: Acompanhe os pagamentos na página "💳 Pagamentos"
+    2. **Criar Campanha**: Crie uma campanha na página "📅 Campanhas" (cria blocos automaticamente)
+    3. **Atribuir Blocos**: Atribua blocos aos escuteiros na página "🎟️ Blocos de Rifas"
+    4. **Escuteiros Vendem**: Escuteiros vendem rifas aos compradores (externamente)
+    5. **Registar Recebimento**: Quando escuteiro entrega canhotos + dinheiro, registe na página "📦 Recebimento"
     """)
 
 st.markdown("---")
@@ -103,23 +103,21 @@ try:
     # Buscar vendas apenas dos blocos da campanha ativa
     vendas_response = supabase.table('vendas').select('*, blocos_rifas!inner(campanha_id)').eq('blocos_rifas.campanha_id', campanha_id).execute()
     
-    # Buscar pagamentos das vendas da campanha ativa
-    venda_ids = [v['id'] for v in vendas_response.data] if vendas_response.data else []
-    if venda_ids:
-        pagamentos_response = supabase.table('pagamentos').select('*').in_('venda_id', venda_ids).execute()
+    # Buscar recebimentos (pagamentos) dos blocos da campanha ativa
+    if blocos_response.data:
+        bloco_ids = [b['id'] for b in blocos_response.data]
+        recebimentos_response = supabase.table('pagamentos').select('*').in_('bloco_id', bloco_ids).execute()
     else:
-        pagamentos_response = type('obj', (object,), {'data': []})()
-    
-    # Calculate metrics
+        recebimentos_response = type('obj', (object,), {'data': []})()       # Calculate metrics
     total_escuteiros = len(escuteiros_response.data) if escuteiros_response.data else 0
     total_blocos = len(blocos_response.data) if blocos_response.data else 0
     total_vendas = len(vendas_response.data) if vendas_response.data else 0
-    total_pagamentos = len(pagamentos_response.data) if pagamentos_response.data else 0
+    total_recebimentos = len(recebimentos_response.data) if recebimentos_response.data else 0
     
     # Calculate financial data
     valor_total_vendas = sum(float(v.get('valor_total', 0)) for v in vendas_response.data) if vendas_response.data else 0
-    valor_total_pago = sum(float(p.get('valor_pago', 0)) for p in pagamentos_response.data) if pagamentos_response.data else 0
-    saldo_pendente = valor_total_vendas - valor_total_pago
+    valor_total_recebido = sum(float(p.get('valor_pago', 0)) for p in recebimentos_response.data) if recebimentos_response.data else 0
+    saldo_pendente = valor_total_vendas - valor_total_recebido
     
     # Calculate total raffle tickets
     total_rifas_vendidas = sum(int(v.get('quantidade', 0)) for v in vendas_response.data) if vendas_response.data else 0
@@ -151,9 +149,9 @@ try:
     
     with col4:
         st.metric(
-            label="💳 Pagamentos Recebidos",
-            value=total_pagamentos,
-            help="Total de pagamentos registados"
+            label="📦 Recebimentos Registados",
+            value=total_recebimentos,
+            help="Total de recebimentos (canhotos + dinheiro) registados"
         )
     
     # Financial summary
@@ -171,8 +169,8 @@ try:
     with col2:
         st.metric(
             label="Total Recebido",
-            value=f"{valor_total_pago:.2f} €",
-            help="Valor total já pago pelos escuteiros"
+            value=f"{valor_total_recebido:.2f} €",
+            help="Valor total já recebido dos escuteiros"
         )
     
     with col3:
@@ -180,7 +178,7 @@ try:
         st.metric(
             label="Saldo Pendente",
             value=f"{saldo_pendente:.2f} €",
-            delta=f"{(valor_total_pago/valor_total_vendas*100):.1f}% pago" if valor_total_vendas > 0 else "0% pago",
+            delta=f"{(valor_total_recebido/valor_total_vendas*100):.1f}% recebido" if valor_total_vendas > 0 else "0% recebido",
             help="Valor ainda por receber dos escuteiros"
         )
     

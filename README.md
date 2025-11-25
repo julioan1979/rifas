@@ -28,10 +28,9 @@ Sistema completo desenvolvido em **Streamlit** com backend **Supabase** para ger
 - 🔒 Prevenção de reatribuição de blocos já atribuídos
 - 📊 3 tabs: Lista, Reservar por Secção, Atribuir a Escuteiro
 
-### 💰 Vendas e Pagamentos
-- 📝 **Vendas:** Registro de vendas por bloco
-- 💳 **Pagamentos:** Controle de pagamentos das vendas
-- 🔄 **Devoluções:** Gestão de devoluções
+### 📦 Recebimento e Devoluções
+- 📦 **Recebimento:** Registo de canhotos e dinheiro recebidos dos escuteiros
+- 🔄 **Devoluções:** Gestão de devoluções de blocos (total ou parcial)
 - 📊 Relatórios consolidados por escuteiro e campanha
 
 ## 🚀 Deploy no Streamlit Cloud
@@ -83,10 +82,9 @@ rifas/
 ├── pages/                          # Páginas da aplicação
 │   ├── 1_👥_Escuteiros.py         # Gestão de escuteiros
 │   ├── 2_🎟️_Blocos_de_Rifas.py   # Gestão de blocos
-│   ├── 3_💰_Vendas.py             # Registro de vendas
-│   ├── 4_💳_Pagamentos.py         # Pagamentos
-│   ├── 5_🔄_Devoluções.py         # Devoluções
-│   └── 7_📅_Campanhas.py          # Gestão de campanhas
+│   ├── 3_📦_Recebimento.py        # Recebimento de canhotos e dinheiro
+│   ├── 4_🔄_Devoluções.py         # Devoluções
+│   └── 5_📅_Campanhas.py          # Gestão de campanhas
 ├── utils/
 │   ├── supabase_client.py         # Cliente Supabase
 │   └── database_schema.py         # Schema SQL
@@ -110,14 +108,19 @@ rifas/
 - **Tab 2:** Reservar por secção (sem escuteiro específico)
 - **Tab 3:** Atribuir individual ou para irmãos
 
-### 3. Escuteiros Vendem Rifas
-- Escuteiros vendem rifas aos compradores
+### 3. Escuteiros Vendem Rifas (Externamente)
+- Escuteiros vendem rifas aos compradores (fora da aplicação)
 - Preenchem canhotos com dados do comprador
+- Recolhem o dinheiro das rifas vendidas
 
-### 4. Registar Vendas e Pagamentos
-- **Tab 3 - Vendas:** Registar vendas por bloco e escuteiro
-- **Tab 4 - Pagamentos:** Registar pagamentos das vendas
-- Status consolidado por escuteiro e campanha
+### 4. Registar Recebimento
+- Aceda a **📦 Recebimento**
+- Quando escuteiro entrega canhotos + dinheiro:
+  - Selecione o bloco/escuteiro
+  - Registe valor recebido
+  - Registe número de canhotos entregues
+  - Adicione observações (rifas perdidas, etc.)
+- Sistema controla valor recebido vs valor esperado do bloco
 
 ## 🗄️ Base de Dados
 
@@ -125,9 +128,8 @@ rifas/
 - `campanhas` - Campanhas de rifas
 - `escuteiros` - Cadastro de escuteiros
 - `blocos_rifas` - Blocos de rifas (com campanha_id e seccao)
-- `vendas` - Registro de vendas por bloco
-- `pagamentos` - Pagamentos das vendas
-- `devolucoes` - Devoluções de blocos
+- `pagamentos` - Recebimento de canhotos e dinheiro dos escuteiros
+- `devolucoes` - Devoluções de blocos (total ou parcial)
 
 ### Campos Importantes
 - `blocos_rifas.campanha_id` - Relacionamento com campanha
