@@ -184,8 +184,11 @@ with tab2:
                         options=['Reserva', 'Lobitos', 'Exploradores', 'Pioneiros', 'Caminheiros', '-- Remover Secção --'],
                         key="seccao_lote_select"
                     )
-                intervalo_inicio = min(bloco_inicial, bloco_final)
-                intervalo_fim = max(bloco_inicial, bloco_final)
+                # Corrigir o cálculo do intervalo exibido
+                bloco_inicial_num = blocos_opcoes[bloco_inicial_idx]['numero_inicial']
+                bloco_final_num = blocos_opcoes[bloco_final_idx]['numero_final']
+                intervalo_inicio = min(bloco_inicial_num, bloco_final_num)
+                intervalo_fim = max(bloco_inicial_num, bloco_final_num)
                 blocos_a_atribuir = [
                     b for b in blocos_disponiveis
                     if b['numero_inicial'] >= intervalo_inicio and b['numero_inicial'] <= intervalo_fim
@@ -242,7 +245,7 @@ with tab3:
     try:
         # Get blocks from selected campaign - ONLY UNASSIGNED
         blocos_response = supabase.table('blocos_rifas').select('*').eq('campanha_id', selected_campanha['id']).is_('escuteiro_id', 'null').order('numero_inicial').execute()
-        
+        blocks_dict = {}  # Garante existência
         if blocos_response.data:
             # Get all escuteiros
             escuteiros_response = supabase.table('escuteiros').select('id, nome, ativo').eq('ativo', True).order('nome').execute()
@@ -257,7 +260,6 @@ with tab3:
                     escuteiros_dict = {e['id']: e['nome'] for e in escuteiros_response.data}
                     
                     # Create block selection dropdown (only unassigned)
-                    blocks_dict = {}
                     for block in blocos_response.data:
                         rifa_range = f"{block['numero_inicial']:03d}-{block['numero_final']:03d}"
                         total_rifas = block['numero_final'] - block['numero_inicial'] + 1
@@ -281,7 +283,12 @@ with tab3:
                     col1.metric("Rifas", f"{block['numero_inicial']} - {block['numero_final']}")
                     col2.metric("Total", f"{total_rifas_bloco} rifas")
                     col3.metric("Secção", block.get('seccao', 'N/A'))
-                    col4.metric("Preço", f"{float(block['preco_unitario']):.2f} €/rifa")
+                    preco = block.get('preco_unitario')
+                    try:
+                        preco_str = f"{float(preco):.2f} €/rifa" if preco is not None else "N/A"
+                    except Exception:
+                        preco_str = "N/A"
+                    col4.metric("Preço", preco_str)
                     
                     st.divider()
                     
