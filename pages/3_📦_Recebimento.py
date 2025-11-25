@@ -357,11 +357,15 @@ with tab3:
                     )
                     
                     # Number of stubs received
+                    rifas_entregues_value = receipt.get('rifas_entregues')
+                    # Se for None, usar total_rifas como padrão
+                    default_rifas = int(rifas_entregues_value) if rifas_entregues_value is not None else total_rifas
+                    
                     new_rifas_entregues = st.number_input(
                         "🎟️ Canhotos Entregues *",
                         min_value=0,
                         max_value=total_rifas,
-                        value=int(receipt.get('rifas_entregues', total_rifas)),
+                        value=default_rifas,
                         step=1,
                         key="edit_rifas"
                     )
