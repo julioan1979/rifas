@@ -149,8 +149,8 @@ with tab2:
     try:
         # Get blocks assigned to scouts (escuteiro_id not null) for this campaign
         blocks_response = supabase.table('blocos_rifas').select(
-            'id, numero_inicial, numero_final, preco_bloco, escuteiros(nome)'
-        ).eq('campanha_id', selected_campanha['id']).neq('escuteiro_id', 'null').order('numero_inicial').execute()
+            'id, numero_inicial, numero_final, preco_bloco, escuteiro_id, escuteiros(nome)'
+        ).eq('campanha_id', selected_campanha['id']).not_.is_('escuteiro_id', 'null').order('numero_inicial').execute()
         
         if not blocks_response.data:
             st.warning("⚠️ Não há blocos atribuídos a escuteiros. Por favor, atribua blocos primeiro.")
@@ -322,8 +322,8 @@ with tab3:
                     with st.form("edit_receipt_form"):
                         # Load blocks for selection
                         blocks_response = supabase.table('blocos_rifas').select(
-                            'id, numero_inicial, numero_final, preco_bloco, escuteiros(nome)'
-                        ).neq('escuteiro_id', 'null').order('numero_inicial').execute()
+                            'id, numero_inicial, numero_final, preco_bloco, escuteiro_id, escuteiros(nome)'
+                        ).not_.is_('escuteiro_id', 'null').order('numero_inicial').execute()
                         
                         # Create blocks dictionary
                         blocks_dict = {}
