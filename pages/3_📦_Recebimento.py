@@ -194,89 +194,91 @@ with tab2:
                         help="Selecione o bloco que o escuteiro está a entregar"
                     )
                     
-                    if selected_block_label:
-                        selected_block, saldo_pendente, total_rifas = blocks_dict[selected_block_label]
-                        preco_bloco = float(selected_block.get('preco_bloco', 0))
-                        
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            st.info(f"💶 Valor do Bloco: **{preco_bloco:.2f} €** | Saldo Pendente: **{saldo_pendente:.2f} €**")
-                            default_valor = saldo_pendente
-                        
-                        with col2:
-                            st.info(f"🎟️ Total de Rifas no Bloco: **{total_rifas}**")
-                        
-                        # Money received
-                        valor_recebido = st.number_input(
-                            "💰 Valor Recebido (€) *",
-                            min_value=0.0,
-                            value=default_valor,
-                            step=0.10,
-                            format="%.2f",
-                            help="Quanto dinheiro o escuteiro entregou"
-                        )
-                        
-                        # Number of stubs received
-                        rifas_entregues = st.number_input(
-                            "🎟️ Canhotos Entregues *",
-                            min_value=0,
-                            max_value=total_rifas,
-                            value=total_rifas,
-                            step=1,
-                            help="Quantos canhotos (rifas vendidas) o escuteiro entregou"
-                        )
-                        
-                        # Stubs observations
-                        observacoes_canhotos = st.text_area(
-                            "📝 Observações sobre Canhotos",
-                            placeholder="Ex: Faltam 2 canhotos (rifas perdidas), todos os canhotos preenchidos corretamente, etc.",
-                            help="Registe aqui qualquer observação sobre os canhotos entregues"
-                        )
-                        
-                        # Payment method
-                        metodo_pagamento = st.selectbox(
-                            "Método de Pagamento",
-                            options=["Dinheiro", "Transferência Bancária", "MB Way", "Multibanco", "Cheque", "Outro"]
-                        )
-                        
-                        # General observations
-                        observacoes = st.text_area(
-                            "📋 Observações Gerais",
-                            placeholder="Ex: Pagamento parcial, restante na próxima semana, etc.",
-                            help="Observações gerais sobre o recebimento"
-                        )
-                        
-                        # Receipt date
-                        data_recebimento = st.date_input(
-                            "📅 Data do Recebimento",
-                            value=datetime.now()
-                        )
-                        
-                        submitted = st.form_submit_button("✅ Registar Recebimento", type="primary", use_container_width=True)
-                        
-                        if submitted:
-                            try:
-                                data = {
-                                    "bloco_id": selected_block['id'],
-                                    "valor_pago": valor_recebido,
-                                    "rifas_entregues": rifas_entregues,
-                                    "observacoes_canhotos": observacoes_canhotos if observacoes_canhotos else None,
-                                    "data_pagamento": data_recebimento.isoformat(),
-                                    "metodo_pagamento": metodo_pagamento,
-                                    "observacoes": observacoes if observacoes else None
-                                }
-                                
-                                response = supabase.table('pagamentos').insert(data).execute()
-                                
-                                if response.data:
-                                    st.toast(f"✅ Recebimento de {valor_recebido:.2f} € registado!", icon="✅")
-                                    st.session_state.form_counter += 1
-                                    st.rerun()
-                                else:
-                                    st.error("Erro ao registar recebimento.")
+                    # Get block data (always, even if not selected)
+                    selected_block, saldo_pendente, total_rifas = blocks_dict[selected_block_label]
+                    preco_bloco = float(selected_block.get('preco_bloco', 0))
+                    block_id = selected_block['id']
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.info(f"💶 Valor do Bloco: **{preco_bloco:.2f} €** | Saldo Pendente: **{saldo_pendente:.2f} €**")
+                    
+                    with col2:
+                        st.info(f"🎟️ Total de Rifas no Bloco: **{total_rifas}**")
+                    
+                    # Money received - key based on block to force refresh
+                    valor_recebido = st.number_input(
+                        "💰 Valor Recebido (€) *",
+                        min_value=0.0,
+                        value=saldo_pendente,
+                        step=0.10,
+                        format="%.2f",
+                        help="Quanto dinheiro o escuteiro entregou",
+                        key=f"valor_{block_id}_{st.session_state.form_counter}"
+                    )
+                    
+                    # Number of stubs received
+                    rifas_entregues = st.number_input(
+                        "🎟️ Canhotos Entregues *",
+                        min_value=0,
+                        max_value=total_rifas,
+                        value=total_rifas,
+                        step=1,
+                        help="Quantos canhotos (rifas vendidas) o escuteiro entregou",
+                        key=f"rifas_{block_id}_{st.session_state.form_counter}"
+                    )
+                    
+                    # Stubs observations
+                    observacoes_canhotos = st.text_area(
+                        "📝 Observações sobre Canhotos",
+                        placeholder="Ex: Faltam 2 canhotos (rifas perdidas), todos os canhotos preenchidos corretamente, etc.",
+                        help="Registe aqui qualquer observação sobre os canhotos entregues"
+                    )
+                    
+                    # Payment method
+                    metodo_pagamento = st.selectbox(
+                        "Método de Pagamento",
+                        options=["Dinheiro", "Transferência Bancária", "MB Way", "Multibanco", "Cheque", "Outro"]
+                    )
+                    
+                    # General observations
+                    observacoes = st.text_area(
+                        "📋 Observações Gerais",
+                        placeholder="Ex: Pagamento parcial, restante na próxima semana, etc.",
+                        help="Observações gerais sobre o recebimento"
+                    )
+                    
+                    # Receipt date
+                    data_recebimento = st.date_input(
+                        "📅 Data do Recebimento",
+                        value=datetime.now()
+                    )
+                    
+                    submitted = st.form_submit_button("✅ Registar Recebimento", type="primary", use_container_width=True)
+                    
+                    if submitted:
+                        try:
+                            data = {
+                                "bloco_id": selected_block['id'],
+                                "valor_pago": valor_recebido,
+                                "rifas_entregues": rifas_entregues,
+                                "observacoes_canhotos": observacoes_canhotos if observacoes_canhotos else None,
+                                "data_pagamento": data_recebimento.isoformat(),
+                                "metodo_pagamento": metodo_pagamento,
+                                "observacoes": observacoes if observacoes else None
+                            }
                             
-                            except Exception as e:
-                                st.error(f"Erro ao registar recebimento: {str(e)}")
+                            response = supabase.table('pagamentos').insert(data).execute()
+                            
+                            if response.data:
+                                st.toast(f"✅ Recebimento de {valor_recebido:.2f} € registado!", icon="✅")
+                                st.session_state.form_counter += 1
+                                st.rerun()
+                            else:
+                                st.error("Erro ao registar recebimento.")
+                        
+                        except Exception as e:
+                            st.error(f"Erro ao registar recebimento: {str(e)}")
     
     except Exception as e:
         st.error(f"Erro ao carregar dados: {str(e)}")
