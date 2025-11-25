@@ -50,7 +50,7 @@ except Exception as e:
     st.stop()
 
 # Tabs for different operations
-tab1, tab2, tab3 = st.tabs(["📋 Lista de Blocos", "🏷️ Reservar por Secção", "➕ Atribuir a Escuteiro"])
+tab1, tab2, tab3 = st.tabs(["📋 Lista de Blocos", "🏷️ Atribuição de Secção", "➕ Atribuir a Escuteiro"])
 
 # Tab 1: List raffle blocks
 with tab1:
@@ -134,193 +134,97 @@ with tab1:
     except Exception as e:
         st.error(f"Erro ao carregar blocos de rifas: {str(e)}")
 
-# Tab 2: Reserve blocks by section
+# Tab 2: Assign section to blocks (individual or batch)
 with tab2:
-    st.subheader("🏷️ Reservar Blocos por Secção")
-    
+    st.subheader("🏷️ Atribuição de Secção")
     st.info("""
-    **Sistema de Reserva:**
-    - Reserve blocos para uma secção específica (Reserva, Lobitos, Exploradores, Pioneiros, Caminheiros)
-    - Blocos reservados ficam marcados com a secção mas ainda sem escuteiro atribuído
-    - Posteriormente pode atribuir escuteiros específicos na tab "Atribuir a Escuteiro"
+    Atribua uma secção a um ou mais blocos completos de rifas de uma só vez. Basta escolher o bloco inicial e final para definir o intervalo (ou o mesmo bloco para apenas um).
+    Blocos atribuídos a uma secção podem depois ser atribuídos a escuteiros na tab "Atribuir a Escuteiro".
     """)
-    
     try:
         # Get blocks from selected campaign
         blocos_response = supabase.table('blocos_rifas').select('*').eq('campanha_id', selected_campanha['id']).order('numero_inicial').execute()
-        
         if blocos_response.data:
-            # Estatísticas por secção
-            df_blocos = pd.DataFrame(blocos_response.data)
-            
-            st.markdown("### 📊 Distribuição Atual")
-            
-            seccoes_info = []
-            for seccao in ['Reserva', 'Lobitos', 'Exploradores', 'Pioneiros', 'Caminheiros']:
-                blocos_seccao = df_blocos[df_blocos['seccao'] == seccao]
-                total_blocos = len(blocos_seccao)
-                blocos_atribuidos = len(blocos_seccao[blocos_seccao['escuteiro_id'].notna()])
-                blocos_reservados = total_blocos - blocos_atribuidos
+            blocos_disponiveis = [b for b in blocos_response.data if not b.get('escuteiro_id')]
+            if blocos_disponiveis:
+                blocos_opcoes = []
+                for b in blocos_disponiveis:
+                    blocos_opcoes.append({
+                        'numero_inicial': b['numero_inicial'],
+                        'numero_final': b['numero_final'],
+                        'label': f"Rifas {b['numero_inicial']}-{b['numero_final']}",
+                        'bloco': b
+                    })
+                blocos_opcoes = sorted(blocos_opcoes, key=lambda x: x['numero_inicial'])
                 
-                seccoes_info.append({
-                    'Secção': seccao,
-                    'Total Blocos': total_blocos,
-                    'Reservados (sem escuteiro)': blocos_reservados,
-                    'Atribuídos (com escuteiro)': blocos_atribuidos
-                })
-            
-            st.dataframe(
-                pd.DataFrame(seccoes_info),
-                hide_index=True,
-                use_container_width=True
-            )
-            
-            st.divider()
-            
-            # Formulário para reservar blocos
-            st.markdown("### 🏷️ Reservar ou Alterar Secção")
-            
-            with st.form("reserve_section_form"):
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    # Filtrar blocos disponíveis ou já com secção
-                    blocos_opcoes = []
-                    for bloco in blocos_response.data:
-                        rifa_range = f"{bloco['numero_inicial']:03d}-{bloco['numero_final']:03d}"
-                        seccao_atual = bloco.get('seccao', 'Sem secção')
-                        esc_id = bloco.get('escuteiro_id')
-                        
-                        if esc_id:
-                            status = "👤 Atribuído"
-                        elif seccao_atual and seccao_atual != 'Sem secção':
-                            status = "🏷️ Reservado"
-                        else:
-                            status = "⬜ Disponível"
-                        
-                        display = f"{status} | Rifas {rifa_range} | {seccao_atual}"
-                        blocos_opcoes.append((display, bloco))
-                    
-                    if blocos_opcoes:
-                        bloco_selecionado_display = st.selectbox(
-                            "Selecione o Bloco",
-                            options=[b[0] for b in blocos_opcoes],
-                            help="Escolha o bloco para reservar/alterar secção"
-                        )
-                        
-                        # Find selected block
-                        bloco_selecionado = None
-                        for display, bloco in blocos_opcoes:
-                            if display == bloco_selecionado_display:
-                                bloco_selecionado = bloco
-                                break
-                    else:
-                        st.warning("Nenhum bloco disponível")
-                        bloco_selecionado = None
-                
-                with col2:
-                    nova_seccao = st.selectbox(
-                        "Secção",
-                        options=['Reserva', 'Lobitos', 'Exploradores', 'Pioneiros', 'Caminheiros', '-- Remover Reserva --'],
-                        help="Secção para reservar este bloco"
-                    )
-                
-                if bloco_selecionado:
-                    total_rifas = bloco_selecionado['numero_final'] - bloco_selecionado['numero_inicial'] + 1
-                    st.info(f"📊 **Bloco:** Rifas {bloco_selecionado['numero_inicial']}-{bloco_selecionado['numero_final']} | **Total:** {total_rifas} rifas")
-                    
-                    if bloco_selecionado.get('escuteiro_id'):
-                        st.warning("⚠️ Este bloco já está atribuído a um escuteiro. A alteração da secção será aplicada mas o escuteiro permanecerá atribuído.")
-                
-                col_btn1, col_btn2 = st.columns([1, 3])
-                with col_btn1:
-                    submitted = st.form_submit_button("💾 Guardar", type="primary", use_container_width=True)
-                with col_btn2:
-                    st.caption("💡 Use '-- Remover Reserva --' para desmarcar a secção")
-                
-                if submitted and bloco_selecionado:
-                    try:
-                        # Determine new section value
-                        if nova_seccao == '-- Remover Reserva --':
-                            update_data = {"seccao": None}
-                            msg = "Reserva removida"
-                        else:
-                            update_data = {"seccao": nova_seccao}
-                            msg = f"Bloco reservado para secção **{nova_seccao}**"
-                        
-                        response = supabase.table('blocos_rifas').update(update_data).eq('id', bloco_selecionado['id']).execute()
-                        
-                        if response.data:
-                            st.success(f"✅ {msg} com sucesso!")
-                            st.rerun()
-                        else:
-                            st.error("Erro ao atualizar bloco.")
-                    
-                    except Exception as e:
-                        st.error(f"Erro: {str(e)}")
-            
-            st.divider()
-            
-            # Ação em lote
-            st.markdown("### 📦 Reserva em Lote")
-            st.caption("Reserve múltiplos blocos sequenciais para uma secção de uma vez")
-            
-            with st.form("batch_reserve_form"):
+                # --- Seletores fora do form para atualização instantânea ---
                 col1, col2, col3 = st.columns(3)
-                
                 with col1:
-                    num_inicial_lote = st.number_input(
-                        "Número Inicial da Rifa",
-                        min_value=1,
-                        value=1,
-                        help="Primeira rifa do intervalo"
+                    bloco_inicial_idx = st.selectbox(
+                        "Bloco Inicial",
+                        options=range(len(blocos_opcoes)),
+                        format_func=lambda x: blocos_opcoes[x]['label'],
+                        help="Selecione o primeiro bloco do intervalo",
+                        key="bloco_inicial_select"
                     )
-                
+                    bloco_inicial = blocos_opcoes[bloco_inicial_idx]['numero_inicial']
                 with col2:
-                    num_final_lote = st.number_input(
-                        "Número Final da Rifa",
-                        min_value=1,
-                        value=10,
-                        help="Última rifa do intervalo"
+                    blocos_finais_opcoes = [i for i, b in enumerate(blocos_opcoes) if b['numero_inicial'] >= bloco_inicial]
+                    bloco_final_idx = st.selectbox(
+                        "Bloco Final",
+                        options=blocos_finais_opcoes,
+                        format_func=lambda x: blocos_opcoes[x]['label'],
+                        help="Selecione o último bloco do intervalo",
+                        key="bloco_final_select"
                     )
-                
+                    bloco_final = blocos_opcoes[bloco_final_idx]['numero_inicial']
                 with col3:
                     seccao_lote = st.selectbox(
-                        "Secção para o Lote",
-                        options=['Reserva', 'Lobitos', 'Exploradores', 'Pioneiros', 'Caminheiros']
+                        "Secção",
+                        options=['Reserva', 'Lobitos', 'Exploradores', 'Pioneiros', 'Caminheiros', '-- Remover Secção --'],
+                        key="seccao_lote_select"
                     )
-                
-                submitted_lote = st.form_submit_button("🏷️ Reservar Lote", type="secondary", use_container_width=True)
-                
-                if submitted_lote:
-                    try:
-                        # Find all blocks in range
-                        blocos_no_intervalo = [
-                            b for b in blocos_response.data
-                            if b['numero_inicial'] >= num_inicial_lote and b['numero_final'] <= num_final_lote
-                        ]
-                        
-                        if blocos_no_intervalo:
-                            # Update all blocks
-                            blocos_atualizados = 0
-                            for bloco in blocos_no_intervalo:
-                                response = supabase.table('blocos_rifas').update({
-                                    "seccao": seccao_lote
-                                }).eq('id', bloco['id']).execute()
-                                
-                                if response.data:
-                                    blocos_atualizados += 1
-                            
-                            st.success(f"✅ {blocos_atualizados} bloco(s) reservado(s) para **{seccao_lote}**!")
-                            st.rerun()
-                        else:
-                            st.warning(f"⚠️ Nenhum bloco encontrado no intervalo {num_inicial_lote}-{num_final_lote}")
-                    
-                    except Exception as e:
-                        st.error(f"Erro: {str(e)}")
+                intervalo_inicio = min(bloco_inicial, bloco_final)
+                intervalo_fim = max(bloco_inicial, bloco_final)
+                blocos_a_atribuir = [
+                    b for b in blocos_disponiveis
+                    if b['numero_inicial'] >= intervalo_inicio and b['numero_inicial'] <= intervalo_fim
+                ]
+                st.info(f"📊 Serão atribuídos até **{len(blocos_a_atribuir)} bloco(s)** completo(s) (Rifas {intervalo_inicio}-{intervalo_fim})")
+                if len(blocos_a_atribuir) == 0:
+                    st.warning("⚠️ Nenhum bloco disponível para atribuição neste intervalo.")
+                # --- Botão de confirmação dentro do form ---
+                with st.form("atribuir_secao_form"):
+                    submitted = st.form_submit_button("🏷️ Atribuir Secção", type="primary", use_container_width=True)
+                    if submitted:
+                        try:
+                            if blocos_a_atribuir:
+                                if seccao_lote == '-- Remover Secção --':
+                                    nova_seccao = None
+                                    msg_acao = "com secção removida"
+                                else:
+                                    nova_seccao = seccao_lote
+                                    msg_acao = f"atribuído(s) à secção **{seccao_lote}**"
+                                blocos_atualizados = 0
+                                for bloco in blocos_a_atribuir:
+                                    response = supabase.table('blocos_rifas').update({
+                                        "seccao": nova_seccao
+                                    }).eq('id', bloco['id']).execute()
+                                    if response.data:
+                                        blocos_atualizados += 1
+                                st.success(f"✅ {blocos_atualizados} bloco(s) completo(s) {msg_acao}!")
+                                st.info("🔄 A página será recarregada...")
+                                import time
+                                time.sleep(1.5)
+                                st.rerun()
+                            else:
+                                st.warning(f"⚠️ Nenhum bloco disponível no intervalo selecionado")
+                        except Exception as e:
+                            st.error(f"Erro: {str(e)}")
+            else:
+                st.info("📭 Nenhum bloco disponível para atribuição de secção.")
         else:
             st.info("📭 Nenhum bloco criado nesta campanha. Crie blocos na página 'Campanhas'.")
-    
     except Exception as e:
         st.error(f"Erro: {str(e)}")
 
@@ -361,11 +265,7 @@ with tab3:
                         
                         display_name = f"{status} Rifas {rifa_range} | {block.get('seccao', 'N/A')} | {total_rifas} rifas"
                         blocks_dict[display_name] = block
-                    status = "✅" if block.get('escuteiro_id') else "⬜"
                     
-                    display_name = f"{status} Rifas {rifa_range} | {block.get('seccao', 'N/A')} | {total_rifas} rifas | {esc_nome}"
-                    blocks_dict[display_name] = block
-                
                 selected_block_name = st.selectbox(
                     "1️⃣ Selecione o bloco de rifas",
                     options=list(blocks_dict.keys()),
@@ -439,10 +339,13 @@ with tab3:
                                 response = supabase.table('blocos_rifas').update(update_data).eq('id', block['id']).execute()
                                 
                                 if response.data:
-                                    if escuteiro_id:
+                                    if response.data:
                                         st.success(f"✅ Bloco (rifas {block['numero_inicial']}-{block['numero_final']}) atribuído a **{selected_escuteiro_name}** com sucesso!")
                                     else:
                                         st.success("✅ Atribuição removida com sucesso!")
+                                    st.info("🔄 A página será recarregada...")
+                                    import time
+                                    time.sleep(1.5)
                                     st.rerun()
                                 else:
                                     st.error("Erro ao atualizar atribuição.")

@@ -166,6 +166,9 @@ with tab2:
                                 except:
                                     pass  # Estado column might not exist
                                 
+                                st.info("🔄 A página será recarregada...")
+                                import time
+                                time.sleep(1.5)
                                 st.rerun()
                             else:
                                 st.error("Erro ao registar devolução.")
@@ -228,6 +231,9 @@ with tab3:
                             
                             if response.data:
                                 st.success("✅ Devolução eliminada com sucesso!")
+                                st.info("🔄 A página será recarregada...")
+                                import time
+                                time.sleep(1.5)
                                 st.rerun()
                             else:
                                 st.error("Erro ao eliminar devolução.")

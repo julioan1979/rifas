@@ -156,6 +156,16 @@ No Supabase SQL Editor, execute:
 ✅ Configura índices e políticas RLS
 ✅ Cria views para relatórios
 
+### Limpar dados para novos testes
+```bash
+python scripts/clear_supabase_data.py --yes
+```
+- Cria um cliente Supabase a partir de `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` (ou `SUPABASE_KEY` como fallback)
+- Limpa as tabelas na ordem certa (`pagamentos`, `devolucoes`, `vendas`, `blocos_rifas`, `escuteiros`, `campanhas`)
+- Use `--dry-run` para revisar o que seria apagado antes de confirmar
+
+**Importante:** este script apenas remove registros; o esquema (tabelas, índices, triggers) permanece. Garanta que `SUPABASE_SERVICE_ROLE_KEY` esteja disponível para ignorar as políticas RLS ao rodar os testes.
+
 ## 🔧 Tecnologias
 
 - **Frontend:** Streamlit 1.31.0+

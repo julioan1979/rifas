@@ -293,7 +293,11 @@ with tab_edit:
                             
                             supabase.table('campanhas').update(update_data).eq('id', campanha_id).execute()
                             
-                            st.success("✅ Campanha atualizada com sucesso!")
+                            st.success(f"✅ Campanha '{novo_nome}' atualizada com sucesso!")
+                            st.info("🔄 A página será recarregada...")
+                            
+                            import time
+                            time.sleep(1.5)
                             st.rerun()
                         except Exception as e:
                             st.error(f"❌ Erro ao atualizar: {e}")
@@ -314,8 +318,12 @@ with tab_edit:
                         if st.button("✅ Sim", use_container_width=True):
                             try:
                                 supabase.table('campanhas').delete().eq('id', campanha_id).execute()
-                                st.success("✅ Campanha eliminada!")
+                                st.success(f"✅ Campanha '{campanha_data['nome']}' eliminada com sucesso!")
+                                st.info("🔄 A página será recarregada...")
                                 del st.session_state['confirmar_eliminacao']
+                                
+                                import time
+                                time.sleep(1.5)
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"❌ Erro: {e}")

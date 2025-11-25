@@ -266,7 +266,10 @@ with tab2:
                         response = supabase.table('pagamentos').insert(data).execute()
                         
                         if response.data:
-                            st.toast(f"✅ Recebimento de {valor_recebido:.2f} € registado!", icon="✅")
+                            st.success(f"✅ Recebimento de {valor_recebido:.2f} € registado com sucesso!")
+                            st.info("🔄 A página será recarregada...")
+                            import time
+                            time.sleep(1.5)
                             st.rerun()
                         else:
                             st.error("Erro ao registar recebimento.")
@@ -419,7 +422,10 @@ with tab3:
                             response = supabase.table('pagamentos').update(update_data).eq('id', receipt['id']).execute()
                             
                             if response.data:
-                                st.toast("✅ Recebimento atualizado!", icon="✅")
+                                st.success("✅ Recebimento atualizado com sucesso!")
+                                st.info("🔄 A página será recarregada...")
+                                import time
+                                time.sleep(1.5)
                                 st.rerun()
                             else:
                                 st.error("Erro ao atualizar recebimento.")
@@ -436,8 +442,11 @@ with tab3:
                             response = supabase.table('pagamentos').delete().eq('id', receipt['id']).execute()
                             
                             if response.data:
-                                st.toast("✅ Recebimento eliminado!", icon="✅")
+                                st.success("✅ Recebimento eliminado com sucesso!")
+                                st.info("🔄 A página será recarregada...")
                                 st.session_state.form_counter += 1
+                                import time
+                                time.sleep(1.5)
                                 st.rerun()
                             else:
                                 st.error("Erro ao eliminar recebimento.")
