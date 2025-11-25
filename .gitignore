@@ -41,10 +41,6 @@ ENV/
 # Streamlit
 .streamlit/secrets.toml
 
-# Scripts com dados sensíveis (nomes reais)
-scripts/importar_natal_2025_corrigido.py
-scripts/importar_*.py
-
 # OS
 .DS_Store
 Thumbs.db

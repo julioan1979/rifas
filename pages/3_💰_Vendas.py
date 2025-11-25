@@ -120,6 +120,11 @@ with tab1:
 with tab2:
     st.subheader("Registar Nova Venda")
     
+    # Mostrar mensagem de sucesso se houver
+    if 'venda_criada' in st.session_state:
+        st.success(f"✅ Venda registada com sucesso!")
+        del st.session_state['venda_criada']
+    
     # Load scouts and blocks for selection
     try:
         scouts_response = supabase.table('escuteiros').select('id, nome').eq('ativo', True).order('nome').execute()
@@ -130,7 +135,7 @@ with tab2:
         elif not blocks_response.data:
             st.warning("⚠️ Não há blocos de rifas criados. Por favor, crie blocos de rifas primeiro.")
         else:
-            with st.form("add_sale_form"):
+            with st.form("add_sale_form", clear_on_submit=True):
                 # Scout selection
                 scouts_dict = {scout['nome']: scout for scout in scouts_response.data}
                 
@@ -138,7 +143,9 @@ with tab2:
                 blocks_dict = {}
                 for block in blocks_response.data:
                     escuteiro = block.get('escuteiros', {}).get('nome', 'Disponível') if block.get('escuteiros') else 'Disponível'
-                    display_name = f"Rifas {block['numero_inicial']}-{block['numero_final']} | {escuteiro}"
+                    total_rifas = block['numero_final'] - block['numero_inicial'] + 1
+                    preco_bloco = block.get('preco_bloco', 0)
+                    display_name = f"Rifas {block['numero_inicial']}-{block['numero_final']} | {escuteiro} | {preco_bloco:.2f}€"
                     blocks_dict[display_name] = block
                 selected_scout = st.selectbox(
                     "Escuteiro *",
@@ -163,9 +170,11 @@ with tab2:
                 
                 # Calculate total value
                 if selected_block:
-                    preco_unitario = float(selected_block['preco_unitario'])
-                    valor_total = quantidade * preco_unitario
-                    st.info(f"💶 Valor Total: **{valor_total:.2f} €** ({quantidade} × {preco_unitario:.2f} €)")
+                    total_rifas_bloco = selected_block['numero_final'] - selected_block['numero_inicial'] + 1
+                    preco_bloco = float(selected_block.get('preco_bloco', 0))
+                    preco_por_rifa = preco_bloco / total_rifas_bloco if total_rifas_bloco > 0 else 0
+                    valor_total = quantidade * preco_por_rifa
+                    st.info(f"💶 Valor Total: **{valor_total:.2f} €** ({quantidade} × {preco_por_rifa:.2f} €)")
                 
                 # Sale date
                 data_venda = st.date_input(
@@ -194,7 +203,7 @@ with tab2:
                             response = supabase.table('vendas').insert(data).execute()
                             
                             if response.data:
-                                st.success(f"✅ Venda registada com sucesso!")
+                                st.session_state['venda_criada'] = True
                                 st.rerun()
                             else:
                                 st.error("Erro ao registar venda.")

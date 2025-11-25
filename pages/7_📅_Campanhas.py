@@ -82,7 +82,12 @@ with tab_list:
 with tab_add:
     st.subheader("➕ Adicionar Nova Campanha")
     
-    with st.form("form_adicionar_campanha"):
+    # Mostrar mensagem de sucesso se houver
+    if 'campanha_criada' in st.session_state:
+        st.success(f"✅ Campanha '{st.session_state.campanha_criada}' criada com sucesso!")
+        del st.session_state['campanha_criada']
+    
+    with st.form("form_adicionar_campanha", clear_on_submit=True):
         col1, col2 = st.columns(2)
         
         with col1:
@@ -115,7 +120,8 @@ with tab_add:
                     response = supabase.table('campanhas').insert(campanha_data).execute()
                     
                     if response.data:
-                        st.success(f"✅ Campanha '{nome}' criada com sucesso!")
+                        # Guardar mensagem de sucesso e fazer rerun para limpar formulário
+                        st.session_state['campanha_criada'] = nome
                         st.rerun()
                     else:
                         st.error("❌ Erro ao criar campanha")
@@ -167,13 +173,13 @@ with tab_create_blocos:
                 )
             
             with col3:
-                preco_unitario = st.number_input(
-                    "Preço por Rifa (€) *",
+                preco_bloco = st.number_input(
+                    "Preço por Bloco (€) *",
                     min_value=0.01,
-                    value=1.00,
+                    value=10.00,
                     step=0.10,
                     format="%.2f",
-                    help="Preço de cada rifa"
+                    help="Preço total de cada bloco"
                 )
             
             # Calcular blocos
@@ -184,7 +190,7 @@ with tab_create_blocos:
                 if rifas_sobra > 0:
                     st.warning(f"⚠️ Com {total_rifas} rifas e blocos de {rifas_por_bloco}, terá {num_blocos} blocos completos e {rifas_sobra} rifas sobrando. Ajuste os números para não haver sobras.")
                 else:
-                    st.success(f"✅ Serão criados **{num_blocos} blocos** de {rifas_por_bloco} rifas cada, totalizando {total_rifas} rifas.")
+                    st.success(f"✅ Serão criados **{num_blocos} blocos** de {rifas_por_bloco} rifas cada, totalizando {total_rifas} rifas. Preço por bloco: {preco_bloco:.2f}€")
             
             submitted = st.form_submit_button("🎟️ Criar Blocos de Rifas", type="primary", use_container_width=True)
             
@@ -209,7 +215,7 @@ with tab_create_blocos:
                                     "nome": f"Bloco {numero_inicial}-{numero_final}",
                                     "numero_inicial": numero_inicial,
                                     "numero_final": numero_final,
-                                    "preco_unitario": preco_unitario,
+                                    "preco_bloco": preco_bloco,
                                     "estado": "disponivel",
                                     "escuteiro_id": None,
                                     "seccao": None

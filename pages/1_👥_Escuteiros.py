@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import re
-import unicodedata
 from utils.supabase_client import get_supabase_client
 
 st.set_page_config(page_title="Escuteiros", page_icon="👥", layout="wide")
@@ -9,15 +8,6 @@ st.set_page_config(page_title="Escuteiros", page_icon="👥", layout="wide")
 st.title("👥 Gestão de Escuteiros")
 
 # Helper functions
-def normalize_text(text):
-    """Remove accents and convert to lowercase for search"""
-    if not text:
-        return ""
-    # Remove accents
-    nfd = unicodedata.normalize('NFD', text)
-    text_without_accents = ''.join(char for char in nfd if unicodedata.category(char) != 'Mn')
-    return text_without_accents.lower()
-
 def validate_email(email):
     """Validate email format"""
     if not email:
@@ -54,23 +44,18 @@ with tab1:
         if response.data:
             df = pd.DataFrame(response.data)
             
-            # Buscar todas as secções de uma vez (1 query apenas!)
-            blocos_response = supabase.table('blocos_rifas').select('escuteiro_id, seccao').not_.is_('escuteiro_id', 'null').execute()
-            
-            # Criar mapa escuteiro -> secção (pega a primeira secção do escuteiro)
+            # Buscar secção de cada escuteiro (da tabela blocos_rifas)
             escuteiro_seccoes = {}
-            if blocos_response.data:
-                for bloco in blocos_response.data:
-                    esc_id = bloco['escuteiro_id']
-                    if esc_id not in escuteiro_seccoes and bloco.get('seccao'):
-                        escuteiro_seccoes[esc_id] = bloco['seccao']
+            for escuteiro in response.data:
+                esc_id = escuteiro['id']
+                blocos_response = supabase.table('blocos_rifas').select('seccao').eq('escuteiro_id', esc_id).limit(1).execute()
+                if blocos_response.data and blocos_response.data[0].get('seccao'):
+                    escuteiro_seccoes[esc_id] = blocos_response.data[0]['seccao']
+                else:
+                    escuteiro_seccoes[esc_id] = '-'
             
             # Adicionar coluna secção
-            df['seccao'] = df['id'].map(lambda x: escuteiro_seccoes.get(x, '-'))
-            
-            # Formatar status ativo com ícones claros
-            if 'ativo' in df.columns:
-                df['status'] = df['ativo'].apply(lambda x: '✅ Ativo' if x else '❌ Inativo')
+            df['seccao'] = df['id'].map(escuteiro_seccoes)
             
             # Formatar data
             if 'created_at' in df.columns:
@@ -81,20 +66,19 @@ with tab1:
                 df['id_curto'] = df['id'].str[:8] + '...'
             
             # Reordenar colunas
-            colunas_ordem = ['id_curto', 'nome', 'seccao', 'email', 'telefone', 'status', 'created_at']
+            colunas_ordem = ['id_curto', 'nome', 'seccao', 'email', 'telefone', 'ativo', 'created_at']
             df = df[[col for col in colunas_ordem if col in df.columns]]
             
             st.dataframe(
                 df,
                 column_config={
                     "id": None,  # Ocultar ID completo
-                    "ativo": None,  # Ocultar coluna original
                     "id_curto": "ID",
                     "nome": "Nome",
                     "seccao": "Secção",
                     "email": "Email",
                     "telefone": "Telefone",
-                    "status": "Status",
+                    "ativo": "Ativo",
                     "created_at": "Data de Registo"
                 },
                 hide_index=True,
@@ -150,30 +134,10 @@ with tab3:
         if response.data:
             # Create a dictionary for scout selection (apenas nome, sem ID)
             scouts_dict = {scout['nome']: scout for scout in response.data}
-            scout_names = sorted(scouts_dict.keys())
-            
-            # Campo de busca
-            search_scout = st.text_input(
-                "🔍 Buscar Escuteiro",
-                placeholder="Digite o nome (com ou sem acentos)...",
-                key="search_edit_scout"
-            )
-            
-            # Filtrar opções baseado na busca
-            if search_scout:
-                search_normalized = normalize_text(search_scout)
-                filtered_names = [name for name in scout_names 
-                                 if search_normalized in normalize_text(name)]
-                if not filtered_names:
-                    st.warning("Nenhum escuteiro encontrado com esse nome.")
-                    filtered_names = scout_names
-            else:
-                filtered_names = scout_names
             
             selected_scout_name = st.selectbox(
                 "Selecione um escuteiro",
-                options=filtered_names,
-                key="select_edit_scout"
+                options=sorted(scouts_dict.keys())
             )
             
             if selected_scout_name:
