@@ -317,107 +317,111 @@ with tab3:
                 with col1:
                     st.subheader("Editar Recebimento")
                     
-                    with st.form("edit_receipt_form"):
-                        # Load blocks for selection
-                        blocks_response = supabase.table('blocos_rifas').select(
-                            'id, numero_inicial, numero_final, preco_bloco, escuteiro_id, escuteiros(nome)'
-                        ).not_.is_('escuteiro_id', 'null').order('numero_inicial').execute()
+                    # Load blocks for selection
+                    blocks_response = supabase.table('blocos_rifas').select(
+                        'id, numero_inicial, numero_final, preco_bloco, escuteiro_id, escuteiros(nome)'
+                    ).not_.is_('escuteiro_id', 'null').order('numero_inicial').execute()
+                    
+                    # Create blocks dictionary
+                    blocks_dict = {}
+                    current_block_label = None
+                    for block in blocks_response.data:
+                        escuteiro = block.get('escuteiros', {})
+                        scout_name = escuteiro.get('nome', 'N/A') if escuteiro else 'N/A'
+                        total_rifas = block['numero_final'] - block['numero_inicial'] + 1
+                        label = f"{scout_name} | Rifas {block['numero_inicial']}-{block['numero_final']} | {total_rifas} rifas"
+                        blocks_dict[label] = (block, total_rifas)
                         
-                        # Create blocks dictionary
-                        blocks_dict = {}
-                        current_block_label = None
-                        for block in blocks_response.data:
-                            escuteiro = block.get('escuteiros', {})
-                            scout_name = escuteiro.get('nome', 'N/A') if escuteiro else 'N/A'
-                            total_rifas = block['numero_final'] - block['numero_inicial'] + 1
-                            label = f"{scout_name} | Rifas {block['numero_inicial']}-{block['numero_final']} | {total_rifas} rifas"
-                            blocks_dict[label] = (block, total_rifas)
+                        if block['id'] == receipt['bloco_id']:
+                            current_block_label = label
+                    
+                    # Block selection
+                    block_index = list(blocks_dict.keys()).index(current_block_label) if current_block_label and current_block_label in blocks_dict else 0
+                    new_block_label = st.selectbox(
+                        "Bloco (Escuteiro) *",
+                        options=list(blocks_dict.keys()),
+                        index=block_index,
+                        key="edit_block"
+                    )
+                    
+                    new_block, total_rifas = blocks_dict[new_block_label]
+                    
+                    # Money received
+                    new_valor_recebido = st.number_input(
+                        "💰 Valor Recebido (€) *",
+                        min_value=0.0,
+                        value=float(receipt['valor_pago']),
+                        step=0.10,
+                        format="%.2f",
+                        key="edit_valor"
+                    )
+                    
+                    # Number of stubs received
+                    new_rifas_entregues = st.number_input(
+                        "🎟️ Canhotos Entregues *",
+                        min_value=0,
+                        max_value=total_rifas,
+                        value=int(receipt.get('rifas_entregues', total_rifas)),
+                        step=1,
+                        key="edit_rifas"
+                    )
+                    
+                    # Stubs observations
+                    new_observacoes_canhotos = st.text_area(
+                        "📝 Observações sobre Canhotos",
+                        value=receipt.get('observacoes_canhotos', '') or '',
+                        key="edit_obs_canhotos"
+                    )
+                    
+                    # Payment method
+                    metodos = ["Dinheiro", "Transferência Bancária", "MB Way", "Multibanco", "Cheque", "Outro"]
+                    current_metodo = receipt.get('metodo_pagamento', 'Dinheiro')
+                    metodo_index = metodos.index(current_metodo) if current_metodo in metodos else 0
+                    
+                    new_metodo_pagamento = st.selectbox(
+                        "Método de Pagamento",
+                        options=metodos,
+                        index=metodo_index,
+                        key="edit_metodo"
+                    )
+                    
+                    # General observations
+                    new_observacoes = st.text_area(
+                        "📋 Observações Gerais",
+                        value=receipt.get('observacoes', '') or '',
+                        key="edit_obs"
+                    )
+                    
+                    # Receipt date
+                    current_date = datetime.fromisoformat(receipt['data_pagamento'].replace('Z', '+00:00'))
+                    new_data_recebimento = st.date_input(
+                        "📅 Data do Recebimento",
+                        value=current_date,
+                        key="edit_data"
+                    )
+                    
+                    if st.button("✅ Atualizar", type="primary", use_container_width=True, key="btn_atualizar"):
+                        try:
+                            update_data = {
+                                "bloco_id": new_block['id'],
+                                "valor_pago": new_valor_recebido,
+                                "rifas_entregues": new_rifas_entregues,
+                                "observacoes_canhotos": new_observacoes_canhotos if new_observacoes_canhotos else None,
+                                "data_pagamento": new_data_recebimento.isoformat(),
+                                "metodo_pagamento": new_metodo_pagamento,
+                                "observacoes": new_observacoes if new_observacoes else None
+                            }
                             
-                            if block['id'] == receipt['bloco_id']:
-                                current_block_label = label
-                        
-                        # Block selection
-                        block_index = list(blocks_dict.keys()).index(current_block_label) if current_block_label and current_block_label in blocks_dict else 0
-                        new_block_label = st.selectbox(
-                            "Bloco (Escuteiro) *",
-                            options=list(blocks_dict.keys()),
-                            index=block_index
-                        )
-                        
-                        new_block, total_rifas = blocks_dict[new_block_label]
-                        
-                        # Money received
-                        new_valor_recebido = st.number_input(
-                            "💰 Valor Recebido (€) *",
-                            min_value=0.0,
-                            value=float(receipt['valor_pago']),
-                            step=0.10,
-                            format="%.2f"
-                        )
-                        
-                        # Number of stubs received
-                        new_rifas_entregues = st.number_input(
-                            "🎟️ Canhotos Entregues *",
-                            min_value=0,
-                            max_value=total_rifas,
-                            value=int(receipt.get('rifas_entregues', total_rifas)),
-                            step=1
-                        )
-                        
-                        # Stubs observations
-                        new_observacoes_canhotos = st.text_area(
-                            "📝 Observações sobre Canhotos",
-                            value=receipt.get('observacoes_canhotos', '') or ''
-                        )
-                        
-                        # Payment method
-                        metodos = ["Dinheiro", "Transferência Bancária", "MB Way", "Multibanco", "Cheque", "Outro"]
-                        current_metodo = receipt.get('metodo_pagamento', 'Dinheiro')
-                        metodo_index = metodos.index(current_metodo) if current_metodo in metodos else 0
-                        
-                        new_metodo_pagamento = st.selectbox(
-                            "Método de Pagamento",
-                            options=metodos,
-                            index=metodo_index
-                        )
-                        
-                        # General observations
-                        new_observacoes = st.text_area(
-                            "📋 Observações Gerais",
-                            value=receipt.get('observacoes', '') or ''
-                        )
-                        
-                        # Receipt date
-                        current_date = datetime.fromisoformat(receipt['data_pagamento'].replace('Z', '+00:00'))
-                        new_data_recebimento = st.date_input(
-                            "📅 Data do Recebimento",
-                            value=current_date
-                        )
-                        
-                        update_submitted = st.form_submit_button("Atualizar", type="primary")
-                        
-                        if update_submitted:
-                            try:
-                                update_data = {
-                                    "bloco_id": new_block['id'],
-                                    "valor_pago": new_valor_recebido,
-                                    "rifas_entregues": new_rifas_entregues,
-                                    "observacoes_canhotos": new_observacoes_canhotos if new_observacoes_canhotos else None,
-                                    "data_pagamento": new_data_recebimento.isoformat(),
-                                    "metodo_pagamento": new_metodo_pagamento,
-                                    "observacoes": new_observacoes if new_observacoes else None
-                                }
-                                
-                                response = supabase.table('pagamentos').update(update_data).eq('id', receipt['id']).execute()
-                                
-                                if response.data:
-                                    st.toast("✅ Recebimento atualizado!", icon="✅")
-                                    st.rerun()
-                                else:
-                                    st.error("Erro ao atualizar recebimento.")
+                            response = supabase.table('pagamentos').update(update_data).eq('id', receipt['id']).execute()
                             
-                            except Exception as e:
-                                st.error(f"Erro ao atualizar recebimento: {str(e)}")
+                            if response.data:
+                                st.toast("✅ Recebimento atualizado!", icon="✅")
+                                st.rerun()
+                            else:
+                                st.error("Erro ao atualizar recebimento.")
+                        
+                        except Exception as e:
+                            st.error(f"Erro ao atualizar recebimento: {str(e)}")
                 
                 with col2:
                     st.subheader("Eliminar")
