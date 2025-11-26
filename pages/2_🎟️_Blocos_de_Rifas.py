@@ -49,8 +49,125 @@ except Exception as e:
     st.error(f"Erro ao carregar campanhas: {str(e)}")
     st.stop()
 
+
 # Tabs for different operations
-tab1, tab2, tab3 = st.tabs(["📋 Lista de Blocos", "🏷️ Atribuição de Secção", "➕ Atribuir a Escuteiro"])
+tab1, tab2, tab3, tab4 = st.tabs(["📋 Lista de Blocos", "🏷️ Atribuição de Secção", "➕ Atribuir a Escuteiro", "📥 Importar Atribuições"])
+# Tab 4: Importação em lote de atribuições
+with tab4:
+    st.subheader("📥 Importar Atribuições em Lote")
+    st.markdown("""
+    Faça download do modelo, preencha as colunas e faça upload para atribuir blocos a escuteiros em massa.
+    - **Colunas obrigatórias:** `bloco_id`, `escuteiro_id`
+    - Você pode obter os IDs corretos exportando as listas de blocos e escuteiros.
+    """)
+
+    import io
+
+
+    # Buscar blocos e escuteiros para exemplo real
+    blocos_resp = supabase.table('blocos_rifas').select('id,numero_inicial,numero_final').eq('campanha_id', selected_campanha['id']).execute()
+    escuteiros_resp = supabase.table('escuteiros').select('id,nome').execute()
+    blocos = blocos_resp.data or []
+    escuteiros = escuteiros_resp.data or []
+
+    # Gerar todas as combinações possíveis de blocos e escuteiros
+    linhas = []
+    from datetime import date
+    data_exemplo = date.today().isoformat()
+    for b in blocos:
+        for e in escuteiros:
+            linhas.append({
+                'bloco_id': b['id'],
+                'escuteiro_id': e['id'],
+                'data_atribuicao': data_exemplo,
+                'observacoes': 'Atribuição em lote',
+                'bloco_info': f"Rifas {b.get('numero_inicial','?')}-{b.get('numero_final','?')}",
+                'escuteiro_nome': e.get('nome','')
+            })
+    colunas_modelo = ['bloco_id','escuteiro_id','data_atribuicao','observacoes','bloco_info','escuteiro_nome']
+    if not linhas:
+        # Garante colunas mesmo sem dados
+        modelo_df = pd.DataFrame(columns=colunas_modelo)
+    else:
+        modelo_df = pd.DataFrame(linhas)
+        # Garante que todas as colunas estejam presentes
+        for col in colunas_modelo:
+            if col not in modelo_df.columns:
+                modelo_df[col] = ''
+    modelo_bytes = io.BytesIO()
+    modelo_df[colunas_modelo].to_excel(modelo_bytes, index=False)
+    modelo_bytes.seek(0)
+    st.download_button(
+        label="⬇️ Baixar modelo Excel (com exemplos reais)",
+        data=modelo_bytes,
+        file_name="modelo_atribuicao_blocos.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    if not blocos or not escuteiros:
+        st.warning("⚠️ Não há blocos ou escuteiros cadastrados para gerar exemplos reais. O modelo terá apenas placeholders.")
+    else:
+        st.caption("Exemplo de IDs válidos incluídos no modelo. Preencha opcionalmente data_atribuicao (YYYY-MM-DD) e observacoes.")
+
+    st.markdown("---")
+    st.markdown("### 1️⃣ Faça upload do Excel preenchido")
+    uploaded_file = st.file_uploader("Carregar arquivo Excel de atribuições", type=["xlsx"])
+
+    if uploaded_file:
+        try:
+            df_import = pd.read_excel(uploaded_file)
+            st.dataframe(df_import, hide_index=True, use_container_width=True)
+            # Validação básica
+            if not {'bloco_id', 'escuteiro_id'}.issubset(df_import.columns):
+                st.error("O arquivo deve conter as colunas 'bloco_id' e 'escuteiro_id'.")
+            else:
+                # Preview e botão de importação
+                if st.button("🚀 Importar atribuições", type="primary", use_container_width=True):
+                    erros = []
+                    sucessos = 0
+                    for idx, row in df_import.iterrows():
+                        bloco_id = row['bloco_id']
+                        escuteiro_id = row['escuteiro_id']
+                        data_atribuicao = row['data_atribuicao'] if 'data_atribuicao' in row and pd.notnull(row['data_atribuicao']) else None
+                        observacoes = row['observacoes'] if 'observacoes' in row and pd.notnull(row['observacoes']) else None
+                        try:
+                            from datetime import datetime
+                            # Verifica se já existe atribuição para o bloco
+                            resp_check = supabase.table('blocos_rifas').select('id').eq('id', bloco_id).execute()
+                            if resp_check.data:
+                                # Atualiza registro existente
+                                update_data = {
+                                    "escuteiro_id": escuteiro_id,
+                                    "data_atribuicao": str(data_atribuicao) if data_atribuicao else datetime.now().isoformat()
+                                }
+                                if observacoes is not None:
+                                    update_data["observacoes"] = observacoes
+                                resp = supabase.table('blocos_rifas').update(update_data).eq('id', bloco_id).execute()
+                                if resp.data:
+                                    sucessos += 1
+                                else:
+                                    erros.append(f"Linha {idx+2}: Falha ao atualizar bloco {bloco_id} para escuteiro {escuteiro_id}")
+                            else:
+                                # Insere novo registro (caso deseje permitir criação de blocos novos)
+                                insert_data = {
+                                    "id": bloco_id,
+                                    "escuteiro_id": escuteiro_id,
+                                    "data_atribuicao": str(data_atribuicao) if data_atribuicao else datetime.now().isoformat(),
+                                    "observacoes": observacoes if observacoes is not None else ''
+                                }
+                                resp = supabase.table('blocos_rifas').insert(insert_data).execute()
+                                if resp.data:
+                                    sucessos += 1
+                                else:
+                                    erros.append(f"Linha {idx+2}: Falha ao inserir bloco {bloco_id} para escuteiro {escuteiro_id}")
+                        except Exception as e:
+                            erros.append(f"Linha {idx+2}: {str(e)}")
+                    if sucessos:
+                        st.success(f"✅ {sucessos} atribuições realizadas/atualizadas com sucesso!")
+                        st.info("🔄 Recarregue a página para ver as alterações.")
+                    if erros:
+                        st.error("\n".join(erros))
+        except Exception as e:
+            st.error(f"Erro ao processar arquivo: {str(e)}")
 
 # Tab 1: List raffle blocks
 with tab1:
