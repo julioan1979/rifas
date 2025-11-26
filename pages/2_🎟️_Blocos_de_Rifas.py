@@ -101,7 +101,21 @@ with tab1:
             df['atribuido'] = df['escuteiro_nome'].apply(lambda x: '✅' if x else '⬜')
             
             # Reordenar colunas (mostrar o preço total do bloco como coluna principal)
-            colunas_ordem = ['atribuido', 'numero_inicial', 'numero_final', 'total_rifas', 'seccao', 'escuteiro_nome', 'preco_bloco', 'data_atribuicao']
+            # garante coluna de observações e reordena
+            if 'observacoes' not in df.columns:
+                df['observacoes'] = ''
+
+            # truncar observações para apresentação na grid (mantemos o texto original na coluna)
+            def _truncate(s, n=80):
+                try:
+                    s = str(s)
+                except Exception:
+                    return ''
+                return s if len(s) <= n else s[:n-1] + '…'
+
+            df['observacoes_display'] = df['observacoes'].fillna('').apply(lambda x: _truncate(x, 80))
+
+            colunas_ordem = ['atribuido', 'numero_inicial', 'numero_final', 'total_rifas', 'seccao', 'escuteiro_nome', 'preco_bloco', 'data_atribuicao', 'observacoes_display']
             df_display = df[[col for col in colunas_ordem if col in df.columns]]
 
             st.dataframe(
@@ -124,10 +138,16 @@ with tab1:
                         format="%.2f €",
                         help="Valor total do bloco (preço unitário × quantidade de rifas)"
                     ),
-                    "data_atribuicao": "Data Atribuição"
+                    "data_atribuicao": "Data Atribuição",
+                    # mostrar observações truncadas na grid; o utilizador pode selecionar o bloco para ver a nota completa
+                    "observacoes_display": st.column_config.TextColumn(
+                        "Observações",
+                        help="Observações (texto truncado). Selecione o bloco para ver a observação completa.",
+                        width="large"
+                    )
                 },
                 hide_index=True,
-                use_container_width=True
+                width='stretch'
             )
             
             # Estatísticas
@@ -476,7 +496,15 @@ with tab3:
                                     help="Selecione o escuteiro que ficará responsável por este bloco",
                                     key="assign_escuteiro_select"
                                 )
-
+                                
+                                # Observations / notes field
+                                observacoes_text = st.text_area(
+                                    "3️⃣ Observações",
+                                    value=block.get('observacoes', '') or '',
+                                    help="Registo de notas ou observações para este bloco (ex: contacto, estado, detalhes).",
+                                    key="assign_observacoes_text",
+                                    height=100
+                                )
                                 # Show current assignment info if exists
                                 if block.get('data_atribuicao'):
                                     st.caption(f"ℹ️ Última atribuição: {pd.to_datetime(block['data_atribuicao']).strftime('%d-%m-%Y')}")
@@ -492,6 +520,10 @@ with tab3:
                                         # selected_escuteiro_id is either None or an id
                                         escuteiro_id = selected_escuteiro_id
                                         update_data = {"escuteiro_id": escuteiro_id}
+                                        
+                                        # include observações (save empty string as NULL)
+                                        obs_val = observacoes_text.strip() if observacoes_text and isinstance(observacoes_text, str) else None
+                                        update_data["observacoes"] = obs_val
 
                                         # Add/update assignment date if assigning
                                         if escuteiro_id:

@@ -326,9 +326,7 @@ with tab2:
                                         except Exception:
                                             pass
 
-                                    # Show an explicit action to go view the list (no immediate rerun)
-                                    if st.button("🔎 Ver na Lista / Recarregar página"):
-                                        st.experimental_rerun()
+                                    # (No immediate rerun here; show summary/actions after the form)
                                 else:
                                     st.error("Erro ao registar devolução.")
 
