@@ -2,31 +2,35 @@ import streamlit as st
 
 
 st.set_page_config(
-	page_title="Bem-vindo — Gestão de Rifas",
+	page_title="📒 Sistema de Gestão de Rifas — Introdução",
 	page_icon="🎫",
 	layout="wide",
 	initial_sidebar_state="expanded",
 )
 
 
-st.title("🎫 Sistema de Gestão de Rifas — Introdução")
+st.title("📒 Sistema de Gestão de Rifas — Introdução")
 
-st.markdown(
-	"""
-	Bem-vindo ao sistema de gestão de rifas dos Escuteiros.
+with st.expander("ℹ️ Sobre o Sistema", expanded=True):
+	st.markdown(
+		"""
+		# Bem-vindo ao Sistema de Gestão de Rifas! 🎯
+		Este sistema permite gerir todos os aspetos das rifas dos escuteiros de forma simples e eficiente.
 
-	Use o menu lateral para navegar entre as páginas:
+		## 🗂️ **Funcionalidades disponíveis:**
+		- **👥 Escuteiros**: Gerir escuteiros que vendem rifas (criar, editar, visualizar)
+		- **🎟️ Blocos de Rifas**: Criar e atribuir blocos de rifas aos escuteiros
+		- **📦 Recebimento**: Registar canhotos e dinheiro recebidos dos escuteiros
+		- **🔄 Devoluções**: Gerir devoluções de blocos (total ou parcial)
 
-	- 👥 Escuteiros
-	- 🎟️ Blocos de Rifas
-	- 📦 Recebimento
-	- 🔄 Devoluções
-	- 📅 Campanhas
-	- 📊 Dashboard
-
-	A página `📊 Dashboard` contém as métricas e gráficos por campanha.
-	"""
-)
+		## 🚀 **Como funciona:**
+		1. **Registar Escuteiros**: Comece por adicionar os escuteiros na página "👥 Escuteiros"
+		2. **Criar Campanha**: Crie uma campanha na página "📅 Campanhas" (cria blocos automaticamente)
+		3. **Criar Blocos**: Crie blocos e atribua aos escuteiros
+		4. **Registar Recebimento**: Quando escuteiro entrega canhotos + dinheiro, registe na página "📦 Recebimento"
+		""",
+		unsafe_allow_html=True
+	)
 
 st.markdown("---")
 
