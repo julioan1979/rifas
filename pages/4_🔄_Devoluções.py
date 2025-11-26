@@ -85,34 +85,64 @@ with tab2:
         elif not blocks_response.data:
             st.warning("⚠️ Não há blocos de rifas criados. Por favor, crie blocos de rifas primeiro.")
         else:
+            # Build selection data outside the form so selection updates immediately
+            blocks_dict = {}
+            display_labels = []
+            id_list = []
+            for block in blocks_response.data:
+                escuteiro_id = block.get('escuteiro_id')
+                if not escuteiro_id:
+                    continue
+                esc = next((s for s in scouts_response.data if s['id'] == escuteiro_id), None)
+                escuteiro_nome = esc['nome'] if esc else 'N/A'
+                display_name = f"{block['nome']} (Rifas {block['numero_inicial']}-{block['numero_final']}) | Escuteiro: {escuteiro_nome}"
+                blocks_dict[block['id']] = block
+                display_labels.append(display_name)
+                id_list.append(block['id'])
+
+            display_map = {bid: lbl for bid, lbl in zip(id_list, display_labels)}
+
+            # Cleanup stale session state value if it doesn't match current options
+            if 'select_bloco_id' in st.session_state and st.session_state.get('select_bloco_id') not in id_list:
+                try:
+                    del st.session_state['select_bloco_id']
+                except Exception:
+                    pass
+
+            selected_block_id = None
+            total_rifas = 1
+            if id_list:
+                selected_block_id = st.selectbox(
+                    "Bloco de Rifas *",
+                    options=id_list,
+                    format_func=lambda bid: display_map.get(bid, str(bid)),
+                    key="select_bloco_id"
+                )
+
+                # selection info kept minimal for UX
+
+                # Compute block totals immediately so we can sync number_input via session_state
+                if selected_block_id:
+                    block_response = supabase.table('blocos_rifas').select('numero_inicial, numero_final').eq('id', selected_block_id).single().execute()
+                    if block_response.data:
+                        block_tmp = {**blocks_dict[selected_block_id], **block_response.data}
+                    else:
+                        block_tmp = blocks_dict[selected_block_id]
+                    try:
+                        total_rifas = int(block_tmp['numero_final']) - int(block_tmp['numero_inicial']) + 1
+                    except Exception:
+                        total_rifas = 1
+
+                    # If the user changed the selected block, update a stable session_state key for the number input
+                    if st.session_state.get('_last_selected_bloco') != selected_block_id:
+                        st.session_state['qtd_rifas'] = total_rifas
+                        st.session_state['_last_selected_bloco'] = selected_block_id
+
             with st.form("add_return_form"):
-                # Block selection (with escuteiro info)
-                blocks_dict = {}
-                display_labels = []
-                id_list = []
-                for block in blocks_response.data:
-                    escuteiro_id = block.get('escuteiro_id')
-                    if not escuteiro_id:
-                        continue
-                    esc = next((s for s in scouts_response.data if s['id'] == escuteiro_id), None)
-                    escuteiro_nome = esc['nome'] if esc else 'N/A'
-                    display_name = f"{block['nome']} (Rifas {block['numero_inicial']}-{block['numero_final']}) | Escuteiro: {escuteiro_nome}"
-                    blocks_dict[block['id']] = block
-                    display_labels.append(display_name)
-                    id_list.append(block['id'])
-                # Debug: mostrar todos os blocos disponíveis no dropdown
-                st.info("<b>DEBUG: Blocos disponíveis no dropdown:</b>", icon="🔎")
-                for i, (label, bid) in enumerate(zip(display_labels, id_list)):
-                    st.code(f"[{i}] id={bid}, nome={blocks_dict[bid]['nome']}, numero_inicial={blocks_dict[bid]['numero_inicial']}, numero_final={blocks_dict[bid]['numero_final']}, label={label}")
-                selected_block_id = None
-                if id_list:
-                    selected_idx = st.selectbox(
-                        "Bloco de Rifas *",
-                        options=range(len(id_list)),
-                        format_func=lambda i: display_labels[i]
-                    )
-                    selected_block_id = id_list[selected_idx]
-                # Buscar sempre o bloco atualizado do banco
+                # The selection widget is outside the form; read selected id from session_state inside the form
+                # (selected_block_id will still be available from the variable above)
+
+                # Buscar sempre o bloco atualizado do banco (para registrar)
                 block = None
                 if selected_block_id:
                     block_response = supabase.table('blocos_rifas').select('numero_inicial, numero_final').eq('id', selected_block_id).single().execute()
@@ -120,46 +150,39 @@ with tab2:
                         block = {**blocks_dict[selected_block_id], **block_response.data}
                     else:
                         block = blocks_dict[selected_block_id]
-                
+
                 # Quantity
-                total_rifas = 1
                 if block:
-                    try:
-                        total_rifas = int(block['numero_final']) - int(block['numero_inicial']) + 1
-                    except Exception:
-                        total_rifas = 1
                     st.info(f"📊 Este bloco tem {total_rifas} rifas no total")
-                    st.warning(f"DEBUG: display_name_selecionado={display_labels[selected_idx]}, id={block.get('id')}, nome={block.get('nome')}, numero_inicial={block.get('numero_inicial')}, numero_final={block.get('numero_final')}, total_rifas={total_rifas}")
+
                 quantidade = st.number_input(
                     "Quantidade de Rifas Devolvidas *",
                     min_value=1,
                     max_value=total_rifas,
-                    value=total_rifas,
+                    value=st.session_state.get('qtd_rifas', total_rifas),
                     step=1,
-                    key=f"qtd_rifas_{selected_block_id}"
+                    key='qtd_rifas'
                 )
-                
-                # Reason
+
                 motivo = st.text_area(
                     "Motivo da Devolução",
                     placeholder="Ex: Rifas não vendidas, mudança de escuteiro, etc.",
                     help="Opcional: descreva o motivo da devolução"
                 )
-                
-                # Return date
+
                 data_devolucao = st.date_input(
                     "Data da Devolução",
                     value=datetime.now()
                 )
-                
+
                 submitted = st.form_submit_button("Registar Devolução", type="primary")
-                
+
                 if submitted:
-                    if not selected_block:
+                    if not selected_block_id:
                         st.error("Por favor, selecione um bloco de rifas!")
                     else:
                         try:
-                            block = blocks_dict[selected_block]
+                            block = blocks_dict[selected_block_id]
                             escuteiro_id = block.get('escuteiro_id')
                             if not escuteiro_id:
                                 st.error("Este bloco não está atribuído a nenhum escuteiro. Não é possível registar devolução.")
