@@ -212,13 +212,33 @@ try:
         )
     
     with col3:
-        delta_color = "inverse" if saldo_pendente > 0 else "normal"
+        # Improved presentation for financial KPIs
+        if valor_total_vendas > 0:
+            pct_label = f"{(valor_total_recebido/valor_total_vendas*100):.1f}% recebido"
+        else:
+            if valor_total_recebido > 0:
+                pct_label = "Recebido sem vendas"
+            else:
+                pct_label = "0% recebido"
+
+        # Show saldo (can be negative if received > vendas)
+        saldo_value = f"{saldo_pendente:.2f} €"
         st.metric(
             label="Saldo Pendente",
-            value=f"{saldo_pendente:.2f} €",
-            delta=f"{(valor_total_recebido/valor_total_vendas*100):.1f}% recebido" if valor_total_vendas > 0 else "0% recebido",
+            value=saldo_value,
+            delta=pct_label,
             help="Valor ainda por receber dos escuteiros"
         )
+
+        # Check for orphan payments (pagamentos sem bloco vinculado)
+        try:
+            orphan_resp = supabase.table('pagamentos').select('*').is_('bloco_id', None).execute()
+            orphan_count = len(orphan_resp.data) if orphan_resp.data else 0
+        except Exception:
+            orphan_count = 0
+
+        if orphan_count > 0:
+            st.warning(f"⚠️ Pagamentos órfãos: {orphan_count} pagamento(s) registado(s) sem bloco vinculado. Verifique a página '📦 Recebimento'.")
     
     # Charts section
     if vendas_response.data and len(vendas_response.data) > 0:
