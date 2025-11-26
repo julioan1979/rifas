@@ -46,16 +46,36 @@ st.markdown('<h1 class="main-header">🎫 Sistema de Gestão de Rifas dos Escute
 try:
     supabase = get_supabase_client()
     
-    # Buscar campanha ativa
-    campanha_response = supabase.table('campanhas').select('*').eq('ativa', True).execute()
-    
-    if campanha_response.data:
-        campanha_ativa = campanha_response.data[0]
-        campanha_id = campanha_ativa['id']
-        st.success(f"✅ Conectado | 📅 Campanha: **{campanha_ativa['nome']}**")
-    else:
-        st.warning("⚠️ Nenhuma campanha ativa. Por favor, ative uma campanha na página de Campanhas.")
+    # Buscar todas as campanhas e definir seleção (inclui opção 'Todas Campanhas')
+    campanhas_resp = supabase.table('campanhas').select('*').order('created_at', desc='desc').execute()
+    campanhas_list = campanhas_resp.data if campanhas_resp.data else []
+
+    if not campanhas_list:
+        st.warning("⚠️ Nenhuma campanha criada. Por favor, crie uma campanha na página 'Campanhas'.")
         campanha_id = None
+    else:
+        # construir dict nome->campanha e identificar campanha ativa
+        campanhas_dict = {c['nome']: c for c in campanhas_list}
+        default_idx = 0
+        for idx, c in enumerate(campanhas_list):
+            if c.get('ativa', False):
+                default_idx = idx
+                break
+
+        # inserir opção para todas as campanhas
+        options = ['Todas Campanhas'] + [c['nome'] for c in campanhas_list]
+        # determine selected name defaulting to active
+        default_name = campanhas_list[default_idx]['nome'] if campanhas_list else None
+        selected_name = st.selectbox("🎯 Selecionar Campanha", options=options, index=0 if default_name is None else options.index(default_name))
+
+        if selected_name == 'Todas Campanhas':
+            selected_campanha = None
+            campanha_id = None
+            st.success(f"✅ Conectado | 📅 Visualizando: Todas as Campanhas")
+        else:
+            selected_campanha = campanhas_dict[selected_name]
+            campanha_id = selected_campanha['id']
+            st.success(f"✅ Conectado | 📅 Campanha: **{selected_campanha['nome']}**")
 except ValueError as e:
     st.error(f"❌ Erro ao conectar ao Supabase")
     st.error(str(e))
@@ -90,25 +110,43 @@ st.markdown("---")
 # Dashboard Statistics
 st.subheader("📊 Dashboard - Visão Geral")
 
-# Verificar se há campanha ativa
-if not campanha_id:
-    st.warning("⚠️ Configure uma campanha ativa para ver as estatísticas")
-    st.stop()
+# Nota: campanha_id == None significa 'Todas Campanhas' (ou nenhuma campanha criada).
 
 try:
-    # Fetch all data filtrado por campanha
-    escuteiros_response = supabase.table('escuteiros').select('*', count='exact').execute()
-    blocos_response = supabase.table('blocos_rifas').select('*').eq('campanha_id', campanha_id).execute()
-    
-    # Buscar vendas apenas dos blocos da campanha ativa
-    vendas_response = supabase.table('vendas').select('*, blocos_rifas!inner(campanha_id)').eq('blocos_rifas.campanha_id', campanha_id).execute()
-    
-    # Buscar recebimentos (pagamentos) dos blocos da campanha ativa
-    if blocos_response.data:
-        bloco_ids = [b['id'] for b in blocos_response.data]
-        recebimentos_response = supabase.table('pagamentos').select('*').in_('bloco_id', bloco_ids).execute()
+    # Fetch data filtered by selected campaign (or all campaigns)
+    # Blocks
+    if campanha_id:
+        blocos_response = supabase.table('blocos_rifas').select('*').eq('campanha_id', campanha_id).execute()
     else:
-        recebimentos_response = type('obj', (object,), {'data': []})()       # Calculate metrics
+        blocos_response = supabase.table('blocos_rifas').select('*').execute()
+
+    # Escuteiros: if a campaign is selected, count only escuteiros who have blocks in that campaign
+    if campanha_id:
+        # collect escuteiro ids from blocks
+        escuteiro_ids = [b.get('escuteiro_id') for b in (blocos_response.data or []) if b.get('escuteiro_id')]
+        if escuteiro_ids:
+            escuteiros_response = supabase.table('escuteiros').select('*', count='exact').in_('id', escuteiro_ids).execute()
+        else:
+            # no escuteiros assigned in this campaign
+            escuteiros_response = type('obj', (object,), {'data': []})()
+    else:
+        escuteiros_response = supabase.table('escuteiros').select('*', count='exact').execute()
+
+    # Vendas
+    if campanha_id:
+        vendas_response = supabase.table('vendas').select('*, blocos_rifas!inner(campanha_id)').eq('blocos_rifas.campanha_id', campanha_id).execute()
+    else:
+        vendas_response = supabase.table('vendas').select('*').execute()
+
+    # Recebimentos (pagamentos)
+    if campanha_id:
+        if blocos_response.data:
+            bloco_ids = [b['id'] for b in blocos_response.data]
+            recebimentos_response = supabase.table('pagamentos').select('*').in_('bloco_id', bloco_ids).execute()
+        else:
+            recebimentos_response = type('obj', (object,), {'data': []})()
+    else:
+        recebimentos_response = supabase.table('pagamentos').select('*').execute()
     total_escuteiros = len(escuteiros_response.data) if escuteiros_response.data else 0
     total_blocos = len(blocos_response.data) if blocos_response.data else 0
     total_vendas = len(vendas_response.data) if vendas_response.data else 0
@@ -192,16 +230,17 @@ try:
         with tab1:
             # Sales by scout
             try:
-                vendas_detalhadas = supabase.table('vendas').select(
-                    '*, escuteiros(nome)'
-                ).execute()
-                
+                if campanha_id:
+                    vendas_detalhadas = supabase.table('vendas').select('*, escuteiros(nome), blocos_rifas!inner(campanha_id)').eq('blocos_rifas.campanha_id', campanha_id).execute()
+                else:
+                    vendas_detalhadas = supabase.table('vendas').select('*, escuteiros(nome)').execute()
+
                 if vendas_detalhadas.data:
                     df_vendas = pd.DataFrame(vendas_detalhadas.data)
                     df_vendas['escuteiro_nome'] = df_vendas['escuteiros'].apply(
                         lambda x: x['nome'] if x else 'Desconhecido'
                     )
-                    
+
                     # Group by scout
                     vendas_por_escuteiro = df_vendas.groupby('escuteiro_nome').agg({
                         'valor_total': 'sum',
@@ -209,7 +248,7 @@ try:
                     }).reset_index()
                     vendas_por_escuteiro.columns = ['Escuteiro', 'Valor Total (€)', 'Rifas Vendidas']
                     vendas_por_escuteiro = vendas_por_escuteiro.sort_values('Valor Total (€)', ascending=False)
-                    
+
                     # Create bar chart
                     fig = px.bar(
                         vendas_por_escuteiro,
@@ -223,7 +262,7 @@ try:
                     fig.update_traces(texttemplate='%{text} rifas', textposition='outside')
                     fig.update_layout(height=400)
                     st.plotly_chart(fig, use_container_width=True)
-                    
+
                     # Show table
                     st.dataframe(
                         vendas_por_escuteiro,
