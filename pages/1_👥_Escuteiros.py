@@ -82,22 +82,50 @@ with tab1:
             # Reordenar colunas
             colunas_ordem = ['id_curto', 'nome', 'seccao', 'email', 'telefone', 'ativo', 'created_at']
             df = df[[col for col in colunas_ordem if col in df.columns]]
-            
-            st.dataframe(
-                df,
-                column_config={
-                    "id": None,  # Ocultar ID completo
-                    "id_curto": "ID",
-                    "nome": "Nome",
-                    "seccao": "Secção",
-                    "email": "Email",
-                    "telefone": "Telefone",
-                    "ativo": "Ativo",
-                    "created_at": "Data de Registo"
-                },
-                hide_index=True,
-                use_container_width=True
-            )
+
+            # Ajustar representação da coluna 'ativo' para mostrar um check verde
+            if 'ativo' in df.columns:
+                # Converter valores possivelmente nulos/booleanos para boolean
+                df['ativo'] = df['ativo'].fillna(False).astype(bool)
+                # Mostrar um ✓ para ativo ou vazio para inativo
+                df['ativo'] = df['ativo'].apply(lambda v: '✅' if v else '')
+
+                # Criar um Styler para colorir o check em verde e centralizar
+                styler = df.style.applymap(
+                    lambda v: 'color: #28a745; font-weight: 600; text-align: center' if v == '✅' else 'color: #6c757d; text-align: center',
+                    subset=['ativo']
+                ).set_properties(**{col: 'text-align: left' for col in df.columns if col != 'ativo'})
+
+                st.dataframe(
+                    styler,
+                    column_config={
+                        "id": None,  # Ocultar ID completo
+                        "id_curto": "ID",
+                        "nome": "Nome",
+                        "seccao": "Secção",
+                        "email": "Email",
+                        "telefone": "Telefone",
+                        "ativo": "Ativo",
+                        "created_at": "Data de Registo"
+                    },
+                    hide_index=True,
+                    use_container_width=True
+                )
+            else:
+                st.dataframe(
+                    df,
+                    column_config={
+                        "id": None,  # Ocultar ID completo
+                        "id_curto": "ID",
+                        "nome": "Nome",
+                        "seccao": "Secção",
+                        "email": "Email",
+                        "telefone": "Telefone",
+                        "created_at": "Data de Registo"
+                    },
+                    hide_index=True,
+                    use_container_width=True
+                )
             st.info(f"📊 Total de escuteiros: {len(df)}")
         else:
             st.info("Nenhum escuteiro registado ainda.")

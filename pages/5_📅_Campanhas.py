@@ -311,33 +311,39 @@ with tab_edit:
             
             with col2:
                 st.markdown("### Eliminar")
+
+                # Placeholder for messages so they always aparecem no topo da coluna
+                msg_placeholder = st.container()
+
+                # Aviso principal fixo
                 st.warning("⚠️ **Atenção!** Ao eliminar uma campanha, todos os blocos, vendas e pagamentos associados serão também eliminados.")
-                
-                if st.button("🗑️ Eliminar Campanha", type="secondary", use_container_width=True):
-                    # Confirmar eliminação
+
+                # Botão principal para iniciar confirmação (usa key única por campanha)
+                if st.button("🗑️ Eliminar Campanha", type="secondary", use_container_width=True, key=f"eliminar_{campanha_id}"):
                     st.session_state['confirmar_eliminacao'] = campanha_id
-                
+
+                # Se for necessário confirmar, mostramos um expander fixo com as ações
                 if st.session_state.get('confirmar_eliminacao') == campanha_id:
-                    st.error("**Tem certeza?**")
-                    col_sim, col_nao = st.columns(2)
-                    
-                    with col_sim:
-                        if st.button("✅ Sim", use_container_width=True):
-                            try:
-                                supabase.table('campanhas').delete().eq('id', campanha_id).execute()
-                                st.success(f"✅ Campanha '{campanha_data['nome']}' eliminada com sucesso!")
-                                st.info("🔄 A página será recarregada...")
+                    with st.expander("⚠️ Tem certeza? Esta ação é irreversível.", expanded=True):
+                        col_sim, col_nao = st.columns(2)
+
+                        with col_sim:
+                            if st.button("✅ Sim", use_container_width=True, key=f"confirm_sim_{campanha_id}"):
+                                try:
+                                    supabase.table('campanhas').delete().eq('id', campanha_id).execute()
+                                    msg_placeholder.success(f"✅ Campanha '{campanha_data['nome']}' eliminada com sucesso!")
+                                    msg_placeholder.info("🔄 A página será recarregada...")
+                                    del st.session_state['confirmar_eliminacao']
+
+                                    import time
+                                    time.sleep(1.2)
+                                    st.rerun()
+                                except Exception as e:
+                                    msg_placeholder.error(f"❌ Erro: {e}")
+
+                        with col_nao:
+                            if st.button("❌ Não", use_container_width=True, key=f"confirm_nao_{campanha_id}"):
                                 del st.session_state['confirmar_eliminacao']
-                                
-                                import time
-                                time.sleep(1.5)
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"❌ Erro: {e}")
-                    
-                    with col_nao:
-                        if st.button("❌ Não", use_container_width=True):
-                            del st.session_state['confirmar_eliminacao']
-                            st.rerun()
+                                st.experimental_rerun()
     else:
         st.info("ℹ️ Nenhuma campanha disponível para editar")
