@@ -5,8 +5,16 @@ import os
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
-# Load environment variables from .env file (for local development)
-load_dotenv()
+# Load environment variables in this order (first found wins):
+# 1. .env (standard)
+# 2. .env.supabase (alternate file used by the project)
+# 3. fallback to default load_dotenv() behavior
+load_dotenv()  # try default .env
+
+import os
+if not os.getenv('SUPABASE_URL') and os.path.exists('.env.supabase'):
+    # If SUPABASE_URL not already set and .env.supabase exists, load it
+    load_dotenv('.env.supabase')
 
 def get_supabase_client() -> Client:
     """

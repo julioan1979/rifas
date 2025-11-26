@@ -69,17 +69,29 @@ with tab1:
             if 'created_at' in df.columns:
                 df['created_at'] = pd.to_datetime(df['created_at']).dt.strftime('%d-%m-%Y')
             
-            # Buscar nomes dos escuteiros
+            # Buscar nomes dos escuteiros e preencher secção se estiver vazia no bloco
             if 'escuteiro_id' in df.columns:
                 escuteiros_ids = df['escuteiro_id'].dropna().unique().tolist()
                 if escuteiros_ids:
-                    esc_response = supabase.table('escuteiros').select('id, nome').in_('id', escuteiros_ids).execute()
-                    esc_dict = {e['id']: e['nome'] for e in esc_response.data}
+                    # trazer também a seccao dos escuteiros
+                    esc_response = supabase.table('escuteiros').select('id, nome, seccao').in_('id', escuteiros_ids).execute()
+                    esc_dict = {e['id']: e['nome'] for e in (esc_response.data or [])}
+                    esc_seccao = {e['id']: e.get('seccao') for e in (esc_response.data or [])}
                     df['escuteiro_nome'] = df['escuteiro_id'].map(esc_dict).fillna('')
+
+                    # preencher a coluna 'seccao' do bloco com a seccao do escuteiro quando estiver vazia
+                    if 'seccao' in df.columns:
+                        df['seccao'] = df['seccao'].fillna(df['escuteiro_id'].map(esc_seccao).fillna(''))
+                    else:
+                        df['seccao'] = df['escuteiro_id'].map(esc_seccao).fillna('')
                 else:
                     df['escuteiro_nome'] = ''
+                    if 'seccao' not in df.columns:
+                        df['seccao'] = ''
             else:
                 df['escuteiro_nome'] = ''
+                if 'seccao' not in df.columns:
+                    df['seccao'] = ''
             
             # Calculate total tickets per block
             if 'numero_inicial' in df.columns and 'numero_final' in df.columns:
@@ -88,10 +100,10 @@ with tab1:
             # Criar indicador de atribuição
             df['atribuido'] = df['escuteiro_nome'].apply(lambda x: '✅' if x else '⬜')
             
-            # Reordenar colunas
-            colunas_ordem = ['atribuido', 'numero_inicial', 'numero_final', 'total_rifas', 'seccao', 'escuteiro_nome', 'preco_unitario', 'data_atribuicao']
+            # Reordenar colunas (mostrar o preço total do bloco como coluna principal)
+            colunas_ordem = ['atribuido', 'numero_inicial', 'numero_final', 'total_rifas', 'seccao', 'escuteiro_nome', 'preco_bloco', 'data_atribuicao']
             df_display = df[[col for col in colunas_ordem if col in df.columns]]
-            
+
             st.dataframe(
                 df_display,
                 column_config={
@@ -107,9 +119,10 @@ with tab1:
                     ),
                     "seccao": "Secção",
                     "escuteiro_nome": "Escuteiro",
-                    "preco_unitario": st.column_config.NumberColumn(
-                        "Preço Unit.",
-                        format="%.2f €"
+                    "preco_bloco": st.column_config.NumberColumn(
+                        "Preço Bloco",
+                        format="%.2f €",
+                        help="Valor total do bloco (preço unitário × quantidade de rifas)"
                     ),
                     "data_atribuicao": "Data Atribuição"
                 },
@@ -286,13 +299,14 @@ with tab3:
                 total_rifas_bloco = block['numero_final'] - block['numero_inicial'] + 1
                 st.info(f"Bloco selecionado: Rifas {block['numero_inicial']} - {block['numero_final']} ({total_rifas_bloco} rifas)")
                 # Seleção de irmãos
-                escuteiros_response = supabase.table('escuteiros').select('id, nome, ativo').eq('ativo', True).order('nome').execute()
+                escuteiros_response = supabase.table('escuteiros').select('id, nome, ativo, seccao').eq('ativo', True).order('nome').execute()
                 if not escuteiros_response.data or len(escuteiros_response.data) < 2:
                     st.warning("⚠️ É necessário pelo menos 2 escuteiros ativos para divisão entre irmãos.")
                 else:
                     # escuteiros: use id-based multiselect to avoid name->id mapping issues
                     esc_ids = [e['id'] for e in escuteiros_response.data]
                     esc_display = {e['id']: e['nome'] for e in escuteiros_response.data}
+                    esc_seccao = {e['id']: e.get('seccao') for e in escuteiros_response.data}
                     selected_irmaos = st.multiselect(
                         "2️⃣ Selecione os irmãos",
                         options=esc_ids,
@@ -319,26 +333,51 @@ with tab3:
                         # Botão de confirmação
                         if st.button("➗ Dividir e atribuir bloco aos irmãos", type="primary", use_container_width=True):
                             try:
-                                # 1. Atribuir bloco original ao primeiro irmão
+                                # 1. Determinar preco_unitario (preferir campo existente, senão derivar)
+                                total_rifas_original = total_rifas_bloco
+                                preco_unitario = block.get('preco_unitario')
+                                try:
+                                    if preco_unitario is None:
+                                        preco_unitario = float(block.get('preco_bloco', 0)) / float(total_rifas_original) if total_rifas_original and total_rifas_original > 0 else 0.0
+                                except Exception:
+                                    preco_unitario = 0.0
+
+                                # 2. Atualizar bloco original para o primeiro irmão com novo intervalo e preços
                                 id_primeiro = selected_irmaos[0]
+                                quantidade_primeiro = intervalos[0][1] - intervalos[0][0] + 1
+                                preco_bloco_primeiro = round(preco_unitario * quantidade_primeiro, 2)
+
+                                # copy seccao from the assigned escuteiro if available
+                                seccao_primeiro = esc_seccao.get(id_primeiro)
                                 update_data = {
                                     "escuteiro_id": id_primeiro,
                                     "numero_inicial": intervalos[0][0],
                                     "numero_final": intervalos[0][1],
+                                    "preco_unitario": preco_unitario,
+                                    "preco_bloco": preco_bloco_primeiro,
+                                    "seccao": seccao_primeiro,
                                     "observacoes": f"Divisão automática entre irmãos: {', '.join([esc_display[eid] for eid in selected_irmaos])}"
                                 }
                                 supabase.table('blocos_rifas').update(update_data).eq('id', block['id']).execute()
-                                # 2. Criar blocos para os outros irmãos (sem preco_unitario)
+
+                                # 3. Criar blocos para os outros irmãos com preços recalculados
                                 for idx in range(1, n_irmaos):
+                                    inicio, fim = intervalos[idx]
+                                    quantidade = fim - inicio + 1
+                                    novo_preco_bloco = round(preco_unitario * quantidade, 2)
+
+                                    # assign seccao from the escuteiro when creating the new block
+                                    seccao_novo = esc_seccao.get(selected_irmaos[idx]) or block.get('seccao')
                                     novo_bloco = {
                                         "campanha_id": block['campanha_id'],
-                                        "nome": f"Bloco {intervalos[idx][0]}-{intervalos[idx][1]}",
-                                        "numero_inicial": intervalos[idx][0],
-                                        "numero_final": intervalos[idx][1],
-                                        "preco_bloco": block.get('preco_bloco'),
+                                        "nome": f"Bloco {inicio}-{fim}",
+                                        "numero_inicial": inicio,
+                                        "numero_final": fim,
+                                        "preco_unitario": preco_unitario,
+                                        "preco_bloco": novo_preco_bloco,
                                         "estado": "atribuido",
                                         "escuteiro_id": selected_irmaos[idx],
-                                        "seccao": block.get('seccao'),
+                                        "seccao": seccao_novo,
                                         "data_atribuicao": pd.Timestamp.now().isoformat(),
                                         "observacoes": f"Divisão automática entre irmãos: {', '.join([esc_display[eid] for eid in selected_irmaos])} (original {block['numero_inicial']}-{block['numero_final']})"
                                     }
@@ -358,8 +397,8 @@ with tab3:
         blocos_response = supabase.table('blocos_rifas').select('*').eq('campanha_id', selected_campanha['id']).is_('escuteiro_id', 'null').order('numero_inicial').execute()
         blocks_dict = {}  # Garante existência
         if blocos_response.data:
-            # Get all escuteiros
-            escuteiros_response = supabase.table('escuteiros').select('id, nome, ativo').eq('ativo', True).order('nome').execute()
+            # Get all escuteiros (including seccao)
+            escuteiros_response = supabase.table('escuteiros').select('id, nome, ativo, seccao').eq('ativo', True).order('nome').execute()
             if not escuteiros_response.data:
                 st.warning("⚠️ Nenhum escuteiro ativo disponível. Ative escuteiros na página 'Escuteiros'.")
             else:
@@ -367,6 +406,7 @@ with tab3:
                     # ===== ATRIBUIÇÃO INDIVIDUAL =====
                     st.markdown("### Atribuição Individual")
                     escuteiros_dict = {e['id']: e['nome'] for e in escuteiros_response.data}
+                    esc_seccao = {e['id']: e.get('seccao') for e in escuteiros_response.data}
 
                     # Create block selection dropdown (only unassigned)
                     id_list = [b['id'] for b in blocos_response.data]
@@ -395,11 +435,22 @@ with tab3:
                             col1.metric("Rifas", f"{block['numero_inicial']} - {block['numero_final']}")
                             col2.metric("Total", f"{total_rifas_bloco} rifas")
                             col3.metric("Secção", block.get('seccao', 'N/A'))
-                            preco = block.get('preco_unitario')
+                            # Mostrar o preço total do bloco (preco_bloco). Se não existir, derivar a partir do preco_unitario.
+                            preco_unitario = block.get('preco_unitario')
+                            preco_bloco_val = None
                             try:
-                                preco_str = f"{float(preco):.2f} €/rifa" if preco is not None else "N/A"
+                                if block.get('preco_bloco') is not None:
+                                    preco_bloco_val = float(block.get('preco_bloco'))
+                                elif preco_unitario is not None:
+                                    preco_bloco_val = float(preco_unitario) * float(total_rifas_bloco)
+                            except Exception:
+                                preco_bloco_val = None
+
+                            try:
+                                preco_str = f"{preco_bloco_val:.2f} €" if preco_bloco_val is not None else "N/A"
                             except Exception:
                                 preco_str = "N/A"
+
                             col4.metric("Preço", preco_str)
                             st.divider()
 
@@ -446,6 +497,8 @@ with tab3:
                                         if escuteiro_id:
                                             from datetime import datetime
                                             update_data["data_atribuicao"] = datetime.now().isoformat()
+                                            # copy the escuteiro's seccao into the block
+                                            update_data["seccao"] = esc_seccao.get(escuteiro_id)
                                         else:
                                             # Clear assignment date if removing assignment
                                             update_data["data_atribuicao"] = None

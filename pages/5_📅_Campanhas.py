@@ -209,23 +209,30 @@ with tab_create_blocos:
                             for i in range(num_blocos):
                                 numero_inicial = numero_atual
                                 numero_final = numero_atual + rifas_por_bloco - 1
-                                
+
+                                # Calcular preco_unitario (preço por rifa) e gravar ambos
+                                try:
+                                    preco_unitario = float(preco_bloco) / float(rifas_por_bloco) if rifas_por_bloco and rifas_por_bloco > 0 else 0.0
+                                except Exception:
+                                    preco_unitario = 0.0
+
                                 bloco_data = {
                                     "campanha_id": campanha_id,
                                     "nome": f"Bloco {numero_inicial}-{numero_final}",
                                     "numero_inicial": numero_inicial,
                                     "numero_final": numero_final,
                                     "preco_bloco": preco_bloco,
+                                    "preco_unitario": preco_unitario,
                                     "estado": "disponivel",
                                     "escuteiro_id": None,
                                     "seccao": None
                                 }
-                                
+
                                 response = supabase.table('blocos_rifas').insert(bloco_data).execute()
-                                
+
                                 if response.data:
                                     blocos_criados += 1
-                                
+
                                 numero_atual = numero_final + 1
                         
                         if blocos_criados == num_blocos:
