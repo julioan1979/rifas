@@ -254,7 +254,7 @@ with tab3:
                 total_rifas = block['numero_final'] - block['numero_inicial'] + 1
                 display_name = f"Rifas {rifa_range} | {block.get('seccao', 'N/A')} | {total_rifas} rifas"
                 blocks_dict[display_name] = block
-            if blocks_dict:
+            if blocks_dict and len(blocks_dict) > 0:
                 selected_block_name = st.selectbox(
                     "1️⃣ Selecione o bloco de rifas",
                     options=list(blocks_dict.keys()),
@@ -334,118 +334,99 @@ with tab3:
         if blocos_response.data:
             # Get all escuteiros
             escuteiros_response = supabase.table('escuteiros').select('id, nome, ativo').eq('ativo', True).order('nome').execute()
-            
             if not escuteiros_response.data:
                 st.warning("⚠️ Nenhum escuteiro ativo disponível. Ative escuteiros na página 'Escuteiros'.")
             else:
                 if opcao_atribuicao == "👤 Individual":
                     # ===== ATRIBUIÇÃO INDIVIDUAL =====
                     st.markdown("### Atribuição Individual")
-                    
                     escuteiros_dict = {e['id']: e['nome'] for e in escuteiros_response.data}
-                    
                     # Create block selection dropdown (only unassigned)
                     for block in blocos_response.data:
                         rifa_range = f"{block['numero_inicial']:03d}-{block['numero_final']:03d}"
                         total_rifas = block['numero_final'] - block['numero_inicial'] + 1
                         status = "⬜"
-                        
                         display_name = f"{status} Rifas {rifa_range} | {block.get('seccao', 'N/A')} | {total_rifas} rifas"
                         blocks_dict[display_name] = block
-                    
-                if not blocks_dict:
-                    st.warning("⚠️ Nenhum bloco disponível para atribuição nesta campanha. Crie ou libere blocos na aba 'Lista de Blocos'.")
-                else:
-                    selected_block_name = st.selectbox(
-                        "1️⃣ Selecione o bloco de rifas",
-                        options=list(blocks_dict.keys()),
-                        help="Escolha o bloco que deseja atribuir a um escuteiro"
-                    )
-                    if selected_block_name:
-                        block = blocks_dict[selected_block_name]
-                        total_rifas_bloco = block['numero_final'] - block['numero_inicial'] + 1
-                        
-                        # Show block info
-                        col1, col2, col3, col4 = st.columns(4)
-                        col1.metric("Rifas", f"{block['numero_inicial']} - {block['numero_final']}")
-                        col2.metric("Total", f"{total_rifas_bloco} rifas")
-                        col3.metric("Secção", block.get('seccao', 'N/A'))
-                        preco = block.get('preco_unitario')
-                        try:
-                            preco_str = f"{float(preco):.2f} €/rifa" if preco is not None else "N/A"
-                        except Exception:
-                            preco_str = "N/A"
-                        col4.metric("Preço", preco_str)
-                        
-                        st.divider()
-                        
-                        with st.form("assign_block_form"):
-                            # Escuteiro selection (allow None for unassignment)
-                            escuteiro_options = ["-- Sem atribuição --"] + [e['nome'] for e in escuteiros_response.data]
-                            
-                            # Get current assignment
-                            current_idx = 0
-                            if block.get('escuteiro_id'):
-                                current_name = escuteiros_dict.get(block['escuteiro_id'])
-                                if current_name in escuteiro_options:
-                                    current_idx = escuteiro_options.index(current_name)
-                            
-                            selected_escuteiro_name = st.selectbox(
-                                "2️⃣ Atribuir a Escuteiro",
-                                options=escuteiro_options,
-                                index=current_idx,
-                                help="Selecione o escuteiro que ficará responsável por este bloco"
-                            )
-                            
-                            # Show current assignment info if exists
-                            if block.get('data_atribuicao'):
-                                st.caption(f"ℹ️ Última atribuição: {pd.to_datetime(block['data_atribuicao']).strftime('%d-%m-%Y')}")
-                            
-                            col_btn1, col_btn2 = st.columns([1, 4])
-                            with col_btn1:
-                                submitted = st.form_submit_button("💾 Guardar", type="primary", use_container_width=True)
-                            with col_btn2:
+                    if not blocks_dict:
+                        st.warning("⚠️ Nenhum bloco disponível para atribuição nesta campanha. Crie ou libere blocos na aba 'Lista de Blocos'.")
+                    else:
+                        selected_block_name = st.selectbox(
+                            "1️⃣ Selecione o bloco de rifas",
+                            options=list(blocks_dict.keys()),
+                            help="Escolha o bloco que deseja atribuir a um escuteiro"
+                        )
+                        if selected_block_name:
+                            block = blocks_dict[selected_block_name]
+                            total_rifas_bloco = block['numero_final'] - block['numero_inicial'] + 1
+                            # Show block info
+                            col1, col2, col3, col4 = st.columns(4)
+                            col1.metric("Rifas", f"{block['numero_inicial']} - {block['numero_final']}")
+                            col2.metric("Total", f"{total_rifas_bloco} rifas")
+                            col3.metric("Secção", block.get('seccao', 'N/A'))
+                            preco = block.get('preco_unitario')
+                            try:
+                                preco_str = f"{float(preco):.2f} €/rifa" if preco is not None else "N/A"
+                            except Exception:
+                                preco_str = "N/A"
+                            col4.metric("Preço", preco_str)
+                            st.divider()
+                            with st.form("assign_block_form"):
+                                # Escuteiro selection (allow None for unassignment)
+                                escuteiro_options = ["-- Sem atribuição --"] + [e['nome'] for e in escuteiros_response.data]
+                                # Get current assignment
+                                current_idx = 0
                                 if block.get('escuteiro_id'):
-                                    st.caption("💡 Para remover atribuição, selecione '-- Sem atribuição --'")
-                            
-                            if submitted:
-                                try:
-                                    # Find escuteiro ID or set to None
-                                    escuteiro_id = None
-                                    if selected_escuteiro_name != "-- Sem atribuição --":
-                                        for e in escuteiros_response.data:
-                                            if e['nome'] == selected_escuteiro_name:
-                                                escuteiro_id = e['id']
-                                                break
-                                    
-                                    update_data = {
-                                        "escuteiro_id": escuteiro_id
-                                    }
-                                    
-                                    # Add/update assignment date if assigning
-                                    if escuteiro_id:
-                                        from datetime import datetime
-                                        update_data["data_atribuicao"] = datetime.now().isoformat()
-                                    else:
-                                        # Clear assignment date if removing assignment
-                                        update_data["data_atribuicao"] = None
-                                    
-                                    response = supabase.table('blocos_rifas').update(update_data).eq('id', block['id']).execute()
-                                    
-                                    if response.data:
-                                        if response.data:
-                                            st.success(f"✅ Bloco (rifas {block['numero_inicial']}-{block['numero_final']}) atribuído a **{selected_escuteiro_name}** com sucesso!")
+                                    current_name = escuteiros_dict.get(block['escuteiro_id'])
+                                    if current_name in escuteiro_options:
+                                        current_idx = escuteiro_options.index(current_name)
+                                selected_escuteiro_name = st.selectbox(
+                                    "2️⃣ Atribuir a Escuteiro",
+                                    options=escuteiro_options,
+                                    index=current_idx,
+                                    help="Selecione o escuteiro que ficará responsável por este bloco"
+                                )
+                                # Show current assignment info if exists
+                                if block.get('data_atribuicao'):
+                                    st.caption(f"ℹ️ Última atribuição: {pd.to_datetime(block['data_atribuicao']).strftime('%d-%m-%Y')}")
+                                col_btn1, col_btn2 = st.columns([1, 4])
+                                submitted = col_btn1.form_submit_button("💾 Guardar", type="primary", use_container_width=True)
+                                with col_btn2:
+                                    if block.get('escuteiro_id'):
+                                        st.caption("💡 Para remover atribuição, selecione '-- Sem atribuição --'")
+                                if submitted:
+                                    try:
+                                        # Find escuteiro ID or set to None
+                                        escuteiro_id = None
+                                        if selected_escuteiro_name != "-- Sem atribuição --":
+                                            for e in escuteiros_response.data:
+                                                if e['nome'] == selected_escuteiro_name:
+                                                    escuteiro_id = e['id']
+                                                    break
+                                        update_data = {
+                                            "escuteiro_id": escuteiro_id
+                                        }
+                                        # Add/update assignment date if assigning
+                                        if escuteiro_id:
+                                            from datetime import datetime
+                                            update_data["data_atribuicao"] = datetime.now().isoformat()
                                         else:
-                                            st.success("✅ Atribuição removida com sucesso!")
-                                        st.info("🔄 A página será recarregada...")
-                                        import time
-                                        time.sleep(1.5)
-                                        st.rerun()
-                                    else:
-                                        st.error("Erro ao atualizar atribuição.")
-                                
-                                except Exception as e:
-                                    st.error(f"Erro ao atualizar atribuição: {str(e)}")
+                                            # Clear assignment date if removing assignment
+                                            update_data["data_atribuicao"] = None
+                                        response = supabase.table('blocos_rifas').update(update_data).eq('id', block['id']).execute()
+                                        if response.data:
+                                            if response.data:
+                                                st.success(f"✅ Bloco (rifas {block['numero_inicial']}-{block['numero_final']}) atribuído a **{selected_escuteiro_name}** com sucesso!")
+                                            else:
+                                                st.success("✅ Atribuição removida com sucesso!")
+                                            st.info("🔄 A página será recarregada...")
+                                            import time
+                                            time.sleep(1.5)
+                                            st.rerun()
+                                        else:
+                                            st.error("Erro ao atualizar atribuição.")
+                                    except Exception as e:
+                                        st.error(f"Erro ao atualizar atribuição: {str(e)}")
         else:
             st.info("📭 Nenhum bloco disponível nesta campanha. Crie blocos na página 'Campanhas'.")
     

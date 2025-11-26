@@ -78,7 +78,7 @@ with tab2:
     # Load scouts and blocks for selection
     try:
         scouts_response = supabase.table('escuteiros').select('id, nome').order('nome').execute()
-        blocks_response = supabase.table('blocos_rifas').select('id, nome, numero_inicial, numero_final').order('nome').execute()
+        blocks_response = supabase.table('blocos_rifas').select('id, nome, numero_inicial, numero_final, escuteiro_id').order('nome').execute()
         
         if not scouts_response.data:
             st.warning("⚠️ Não há escuteiros registados. Por favor, adicione escuteiros primeiro.")
@@ -86,41 +86,58 @@ with tab2:
             st.warning("⚠️ Não há blocos de rifas criados. Por favor, crie blocos de rifas primeiro.")
         else:
             with st.form("add_return_form"):
-                # Scout selection
-                scouts_dict = {scout['nome']: scout for scout in scouts_response.data}
-                selected_scout = st.selectbox(
-                    "Escuteiro *",
-                    options=list(scouts_dict.keys())
-                )
-                
-                # Block selection
-                blocks_dict = {f"{block['nome']} (Rifas {block['numero_inicial']}-{block['numero_final']})": block 
-                              for block in blocks_response.data}
-                selected_block = st.selectbox(
-                    "Bloco de Rifas *",
-                    options=list(blocks_dict.keys())
-                )
+                # Block selection (with escuteiro info)
+                blocks_dict = {}
+                display_labels = []
+                id_list = []
+                for block in blocks_response.data:
+                    escuteiro_id = block.get('escuteiro_id')
+                    if not escuteiro_id:
+                        continue
+                    esc = next((s for s in scouts_response.data if s['id'] == escuteiro_id), None)
+                    escuteiro_nome = esc['nome'] if esc else 'N/A'
+                    display_name = f"{block['nome']} (Rifas {block['numero_inicial']}-{block['numero_final']}) | Escuteiro: {escuteiro_nome}"
+                    blocks_dict[block['id']] = block
+                    display_labels.append(display_name)
+                    id_list.append(block['id'])
+                # Debug: mostrar todos os blocos disponíveis no dropdown
+                st.info("<b>DEBUG: Blocos disponíveis no dropdown:</b>", icon="🔎")
+                for i, (label, bid) in enumerate(zip(display_labels, id_list)):
+                    st.code(f"[{i}] id={bid}, nome={blocks_dict[bid]['nome']}, numero_inicial={blocks_dict[bid]['numero_inicial']}, numero_final={blocks_dict[bid]['numero_final']}, label={label}")
+                selected_block_id = None
+                if id_list:
+                    selected_idx = st.selectbox(
+                        "Bloco de Rifas *",
+                        options=range(len(id_list)),
+                        format_func=lambda i: display_labels[i]
+                    )
+                    selected_block_id = id_list[selected_idx]
+                # Buscar sempre o bloco atualizado do banco
+                block = None
+                if selected_block_id:
+                    block_response = supabase.table('blocos_rifas').select('numero_inicial, numero_final').eq('id', selected_block_id).single().execute()
+                    if block_response.data:
+                        block = {**blocks_dict[selected_block_id], **block_response.data}
+                    else:
+                        block = blocks_dict[selected_block_id]
                 
                 # Quantity
-                if selected_block:
-                    block = blocks_dict[selected_block]
-                    total_rifas = block['numero_final'] - block['numero_inicial'] + 1
+                total_rifas = 1
+                if block:
+                    try:
+                        total_rifas = int(block['numero_final']) - int(block['numero_inicial']) + 1
+                    except Exception:
+                        total_rifas = 1
                     st.info(f"📊 Este bloco tem {total_rifas} rifas no total")
-                    
-                    quantidade = st.number_input(
-                        "Quantidade de Rifas Devolvidas *",
-                        min_value=1,
-                        max_value=total_rifas,
-                        value=total_rifas,
-                        step=1
-                    )
-                else:
-                    quantidade = st.number_input(
-                        "Quantidade de Rifas Devolvidas *",
-                        min_value=1,
-                        value=1,
-                        step=1
-                    )
+                    st.warning(f"DEBUG: display_name_selecionado={display_labels[selected_idx]}, id={block.get('id')}, nome={block.get('nome')}, numero_inicial={block.get('numero_inicial')}, numero_final={block.get('numero_final')}, total_rifas={total_rifas}")
+                quantidade = st.number_input(
+                    "Quantidade de Rifas Devolvidas *",
+                    min_value=1,
+                    max_value=total_rifas,
+                    value=total_rifas,
+                    step=1,
+                    key=f"qtd_rifas_{selected_block_id}"
+                )
                 
                 # Reason
                 motivo = st.text_area(
@@ -138,41 +155,39 @@ with tab2:
                 submitted = st.form_submit_button("Registar Devolução", type="primary")
                 
                 if submitted:
-                    if not selected_scout or not selected_block:
-                        st.error("Por favor, selecione um escuteiro e um bloco de rifas!")
+                    if not selected_block:
+                        st.error("Por favor, selecione um bloco de rifas!")
                     else:
                         try:
-                            scout_id = scouts_dict[selected_scout]['id']
-                            block_id = blocks_dict[selected_block]['id']
-                            
-                            data = {
-                                "escuteiro_id": scout_id,
-                                "bloco_id": block_id,
-                                "quantidade": quantidade,
-                                "motivo": motivo.strip() if motivo else None,
-                                "data_devolucao": data_devolucao.isoformat()
-                            }
-                            
-                            response = supabase.table('devolucoes').insert(data).execute()
-                            
-                            if response.data:
-                                st.success(f"✅ Devolução de {quantidade} rifas registada com sucesso!")
-                                
-                                # Optionally update block status
-                                try:
-                                    supabase.table('blocos_rifas').update({
-                                        'estado': 'devolvido'
-                                    }).eq('id', block_id).execute()
-                                except:
-                                    pass  # Estado column might not exist
-                                
-                                st.info("🔄 A página será recarregada...")
-                                import time
-                                time.sleep(1.5)
-                                st.rerun()
+                            block = blocks_dict[selected_block]
+                            escuteiro_id = block.get('escuteiro_id')
+                            if not escuteiro_id:
+                                st.error("Este bloco não está atribuído a nenhum escuteiro. Não é possível registar devolução.")
                             else:
-                                st.error("Erro ao registar devolução.")
-                        
+                                block_id = block['id']
+                                data = {
+                                    "escuteiro_id": escuteiro_id,
+                                    "bloco_id": block_id,
+                                    "quantidade": quantidade,
+                                    "motivo": motivo.strip() if motivo else None,
+                                    "data_devolucao": data_devolucao.isoformat()
+                                }
+                                response = supabase.table('devolucoes').insert(data).execute()
+                                if response.data:
+                                    st.success(f"✅ Devolução de {quantidade} rifas registada com sucesso!")
+                                    # Optionally update block status
+                                    try:
+                                        supabase.table('blocos_rifas').update({
+                                            'estado': 'devolvido'
+                                        }).eq('id', block_id).execute()
+                                    except:
+                                        pass  # Estado column might not exist
+                                    st.info("🔄 A página será recarregada...")
+                                    import time
+                                    time.sleep(1.5)
+                                    st.rerun()
+                                else:
+                                    st.error("Erro ao registar devolução.")
                         except Exception as e:
                             st.error(f"Erro ao registar devolução: {str(e)}")
                             if "devolucoes" in str(e).lower():
