@@ -159,34 +159,43 @@ with tab2:
                 
                 # --- Seletores fora do form para atualização instantânea ---
                 col1, col2, col3 = st.columns(3)
+                # Build id-based maps for stable selectbox options
+                id_list = [opt['bloco']['id'] for opt in blocos_opcoes]
+                display_map = {opt['bloco']['id']: opt['label'] for opt in blocos_opcoes}
+                blocks_map = {opt['bloco']['id']: opt['bloco'] for opt in blocos_opcoes}
+
                 with col1:
-                    bloco_inicial_idx = st.selectbox(
+                    selected_bloco_inicial_id = st.selectbox(
                         "Bloco Inicial",
-                        options=range(len(blocos_opcoes)),
-                        format_func=lambda x: blocos_opcoes[x]['label'],
+                        options=id_list,
+                        format_func=lambda bid: display_map.get(bid, str(bid)),
                         help="Selecione o primeiro bloco do intervalo",
                         key="bloco_inicial_select"
                     )
-                    bloco_inicial = blocos_opcoes[bloco_inicial_idx]['numero_inicial']
+                    bloco_inicial = blocks_map[selected_bloco_inicial_id]['numero_inicial']
+
                 with col2:
-                    blocos_finais_opcoes = [i for i, b in enumerate(blocos_opcoes) if b['numero_inicial'] >= bloco_inicial]
-                    bloco_final_idx = st.selectbox(
+                    # final options are ids where numero_inicial >= selected initial
+                    blocos_finais_ids = [opt['bloco']['id'] for opt in blocos_opcoes if opt['numero_inicial'] >= bloco_inicial]
+                    selected_bloco_final_id = st.selectbox(
                         "Bloco Final",
-                        options=blocos_finais_opcoes,
-                        format_func=lambda x: blocos_opcoes[x]['label'],
+                        options=blocos_finais_ids,
+                        format_func=lambda bid: display_map.get(bid, str(bid)),
                         help="Selecione o último bloco do intervalo",
                         key="bloco_final_select"
                     )
-                    bloco_final = blocos_opcoes[bloco_final_idx]['numero_inicial']
+                    bloco_final = blocks_map[selected_bloco_final_id]['numero_inicial']
+
                 with col3:
                     seccao_lote = st.selectbox(
                         "Secção",
                         options=['Lobitos', 'Exploradores', 'Pioneiros', 'Caminheiros', '-- Remover Secção --'],
                         key="seccao_lote_select"
                     )
+
                 # Corrigir o cálculo do intervalo exibido
-                bloco_inicial_num = blocos_opcoes[bloco_inicial_idx]['numero_inicial']
-                bloco_final_num = blocos_opcoes[bloco_final_idx]['numero_final']
+                bloco_inicial_num = blocks_map[selected_bloco_inicial_id]['numero_inicial']
+                bloco_final_num = blocks_map[selected_bloco_final_id]['numero_final']
                 intervalo_inicio = min(bloco_inicial_num, bloco_final_num)
                 intervalo_fim = max(bloco_inicial_num, bloco_final_num)
                 blocos_a_atribuir = [
@@ -255,12 +264,25 @@ with tab3:
                 display_name = f"Rifas {rifa_range} | {block.get('seccao', 'N/A')} | {total_rifas} rifas"
                 blocks_dict[display_name] = block
             if blocks_dict and len(blocks_dict) > 0:
-                selected_block_name = st.selectbox(
+                # Use id-based selection to avoid label/index desync
+                id_list = [b['id'] for b in blocos_response.data]
+                display_map = {}
+                blocks_map = {}
+                for b in blocos_response.data:
+                    rifa_range = f"{b['numero_inicial']:03d}-{b['numero_final']:03d}"
+                    total_rifas = b['numero_final'] - b['numero_inicial'] + 1
+                    display_name = f"Rifas {rifa_range} | {b.get('seccao', 'N/A')} | {total_rifas} rifas"
+                    display_map[b['id']] = display_name
+                    blocks_map[b['id']] = b
+
+                selected_block_id = st.selectbox(
                     "1️⃣ Selecione o bloco de rifas",
-                    options=list(blocks_dict.keys()),
-                    help="Escolha o bloco a dividir entre irmãos"
+                    options=id_list,
+                    format_func=lambda bid: display_map.get(bid, str(bid)),
+                    help="Escolha o bloco a dividir entre irmãos",
+                    key="dividir_bloco_select"
                 )
-                block = blocks_dict[selected_block_name]
+                block = blocks_map[selected_block_id]
                 total_rifas_bloco = block['numero_final'] - block['numero_inicial'] + 1
                 st.info(f"Bloco selecionado: Rifas {block['numero_inicial']} - {block['numero_final']} ({total_rifas_bloco} rifas)")
                 # Seleção de irmãos
@@ -268,11 +290,15 @@ with tab3:
                 if not escuteiros_response.data or len(escuteiros_response.data) < 2:
                     st.warning("⚠️ É necessário pelo menos 2 escuteiros ativos para divisão entre irmãos.")
                 else:
-                    escuteiros_dict = {e['nome']: e['id'] for e in escuteiros_response.data}
+                    # escuteiros: use id-based multiselect to avoid name->id mapping issues
+                    esc_ids = [e['id'] for e in escuteiros_response.data]
+                    esc_display = {e['id']: e['nome'] for e in escuteiros_response.data}
                     selected_irmaos = st.multiselect(
                         "2️⃣ Selecione os irmãos",
-                        options=list(escuteiros_dict.keys()),
-                        help="Selecione 2 ou mais irmãos para dividir o bloco"
+                        options=esc_ids,
+                        format_func=lambda eid: esc_display.get(eid, str(eid)),
+                        help="Selecione 2 ou mais irmãos para dividir o bloco",
+                        key="dividir_irmaos_select"
                     )
                     if len(selected_irmaos) >= 2:
                         n_irmaos = len(selected_irmaos)
@@ -294,12 +320,12 @@ with tab3:
                         if st.button("➗ Dividir e atribuir bloco aos irmãos", type="primary", use_container_width=True):
                             try:
                                 # 1. Atribuir bloco original ao primeiro irmão
-                                id_primeiro = escuteiros_dict[selected_irmaos[0]]
+                                id_primeiro = selected_irmaos[0]
                                 update_data = {
                                     "escuteiro_id": id_primeiro,
                                     "numero_inicial": intervalos[0][0],
                                     "numero_final": intervalos[0][1],
-                                    "observacoes": f"Divisão automática entre irmãos: {', '.join(selected_irmaos)}"
+                                    "observacoes": f"Divisão automática entre irmãos: {', '.join([esc_display[eid] for eid in selected_irmaos])}"
                                 }
                                 supabase.table('blocos_rifas').update(update_data).eq('id', block['id']).execute()
                                 # 2. Criar blocos para os outros irmãos (sem preco_unitario)
@@ -311,10 +337,10 @@ with tab3:
                                         "numero_final": intervalos[idx][1],
                                         "preco_bloco": block.get('preco_bloco'),
                                         "estado": "atribuido",
-                                        "escuteiro_id": escuteiros_dict[selected_irmaos[idx]],
+                                        "escuteiro_id": selected_irmaos[idx],
                                         "seccao": block.get('seccao'),
                                         "data_atribuicao": pd.Timestamp.now().isoformat(),
-                                        "observacoes": f"Divisão automática entre irmãos: {', '.join(selected_irmaos)} (original {block['numero_inicial']}-{block['numero_final']})"
+                                        "observacoes": f"Divisão automática entre irmãos: {', '.join([esc_display[eid] for eid in selected_irmaos])} (original {block['numero_inicial']}-{block['numero_final']})"
                                     }
                                     supabase.table('blocos_rifas').insert(novo_bloco).execute()
                                 st.success("✅ Bloco dividido e atribuído aos irmãos com sucesso!")
@@ -341,24 +367,29 @@ with tab3:
                     # ===== ATRIBUIÇÃO INDIVIDUAL =====
                     st.markdown("### Atribuição Individual")
                     escuteiros_dict = {e['id']: e['nome'] for e in escuteiros_response.data}
+
                     # Create block selection dropdown (only unassigned)
-                    for block in blocos_response.data:
-                        rifa_range = f"{block['numero_inicial']:03d}-{block['numero_final']:03d}"
-                        total_rifas = block['numero_final'] - block['numero_inicial'] + 1
-                        status = "⬜"
-                        display_name = f"{status} Rifas {rifa_range} | {block.get('seccao', 'N/A')} | {total_rifas} rifas"
-                        blocks_dict[display_name] = block
-                    if not blocks_dict:
+                    id_list = [b['id'] for b in blocos_response.data]
+                    display_map = {
+                        b['id']: f"⬜ Rifas {b['numero_inicial']:03d}-{b['numero_final']:03d} | {b.get('seccao', 'N/A')} | {b['numero_final']-b['numero_inicial']+1} rifas"
+                        for b in blocos_response.data
+                    }
+                    blocks_map = {b['id']: b for b in blocos_response.data}
+
+                    if not id_list:
                         st.warning("⚠️ Nenhum bloco disponível para atribuição nesta campanha. Crie ou libere blocos na aba 'Lista de Blocos'.")
                     else:
-                        selected_block_name = st.selectbox(
+                        selected_block_id = st.selectbox(
                             "1️⃣ Selecione o bloco de rifas",
-                            options=list(blocks_dict.keys()),
-                            help="Escolha o bloco que deseja atribuir a um escuteiro"
+                            options=id_list,
+                            format_func=lambda bid: display_map.get(bid, str(bid)),
+                            help="Escolha o bloco que deseja atribuir a um escuteiro",
+                            key="assign_block_select"
                         )
-                        if selected_block_name:
-                            block = blocks_dict[selected_block_name]
+                        if selected_block_id:
+                            block = blocks_map[selected_block_id]
                             total_rifas_bloco = block['numero_final'] - block['numero_inicial'] + 1
+
                             # Show block info
                             col1, col2, col3, col4 = st.columns(4)
                             col1.metric("Rifas", f"{block['numero_inicial']} - {block['numero_final']}")
@@ -371,41 +402,46 @@ with tab3:
                                 preco_str = "N/A"
                             col4.metric("Preço", preco_str)
                             st.divider()
+
                             with st.form("assign_block_form"):
                                 # Escuteiro selection (allow None for unassignment)
-                                escuteiro_options = ["-- Sem atribuição --"] + [e['nome'] for e in escuteiros_response.data]
-                                # Get current assignment
-                                current_idx = 0
+                                esc_ids = [e['id'] for e in escuteiros_response.data]
+                                esc_display = {e['id']: e['nome'] for e in escuteiros_response.data}
+                                options = [None] + esc_ids
+
+                                # determine default index based on current assignment
+                                default_index = 0
                                 if block.get('escuteiro_id'):
-                                    current_name = escuteiros_dict.get(block['escuteiro_id'])
-                                    if current_name in escuteiro_options:
-                                        current_idx = escuteiro_options.index(current_name)
-                                selected_escuteiro_name = st.selectbox(
+                                    try:
+                                        default_index = options.index(block.get('escuteiro_id'))
+                                    except ValueError:
+                                        default_index = 0
+
+                                selected_escuteiro_id = st.selectbox(
                                     "2️⃣ Atribuir a Escuteiro",
-                                    options=escuteiro_options,
-                                    index=current_idx,
-                                    help="Selecione o escuteiro que ficará responsável por este bloco"
+                                    options=options,
+                                    index=default_index,
+                                    format_func=lambda eid: "-- Sem atribuição --" if eid is None else esc_display.get(eid, str(eid)),
+                                    help="Selecione o escuteiro que ficará responsável por este bloco",
+                                    key="assign_escuteiro_select"
                                 )
+
                                 # Show current assignment info if exists
                                 if block.get('data_atribuicao'):
                                     st.caption(f"ℹ️ Última atribuição: {pd.to_datetime(block['data_atribuicao']).strftime('%d-%m-%Y')}")
+
                                 col_btn1, col_btn2 = st.columns([1, 4])
                                 submitted = col_btn1.form_submit_button("💾 Guardar", type="primary", use_container_width=True)
                                 with col_btn2:
                                     if block.get('escuteiro_id'):
                                         st.caption("💡 Para remover atribuição, selecione '-- Sem atribuição --'")
+
                                 if submitted:
                                     try:
-                                        # Find escuteiro ID or set to None
-                                        escuteiro_id = None
-                                        if selected_escuteiro_name != "-- Sem atribuição --":
-                                            for e in escuteiros_response.data:
-                                                if e['nome'] == selected_escuteiro_name:
-                                                    escuteiro_id = e['id']
-                                                    break
-                                        update_data = {
-                                            "escuteiro_id": escuteiro_id
-                                        }
+                                        # selected_escuteiro_id is either None or an id
+                                        escuteiro_id = selected_escuteiro_id
+                                        update_data = {"escuteiro_id": escuteiro_id}
+
                                         # Add/update assignment date if assigning
                                         if escuteiro_id:
                                             from datetime import datetime
@@ -413,10 +449,13 @@ with tab3:
                                         else:
                                             # Clear assignment date if removing assignment
                                             update_data["data_atribuicao"] = None
+
                                         response = supabase.table('blocos_rifas').update(update_data).eq('id', block['id']).execute()
                                         if response.data:
-                                            if response.data:
-                                                st.success(f"✅ Bloco (rifas {block['numero_inicial']}-{block['numero_final']}) atribuído a **{selected_escuteiro_name}** com sucesso!")
+                                            # Determine name for success message
+                                            if escuteiro_id:
+                                                nome_esc = esc_display.get(escuteiro_id, str(escuteiro_id))
+                                                st.success(f"✅ Bloco (rifas {block['numero_inicial']}-{block['numero_final']}) atribuído a **{nome_esc}** com sucesso!")
                                             else:
                                                 st.success("✅ Atribuição removida com sucesso!")
                                             st.info("🔄 A página será recarregada...")
@@ -429,6 +468,5 @@ with tab3:
                                         st.error(f"Erro ao atualizar atribuição: {str(e)}")
         else:
             st.info("📭 Nenhum bloco disponível nesta campanha. Crie blocos na página 'Campanhas'.")
-    
     except Exception as e:
         st.error(f"Erro ao carregar dados: {str(e)}")

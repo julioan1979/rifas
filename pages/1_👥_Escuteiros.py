@@ -232,8 +232,9 @@ with tab3:
         response = supabase.table('escuteiros').select('*').order('nome').execute()
         
         if response.data:
-            # Create a dictionary for scout selection (apenas nome, sem ID)
-            scouts_dict = {scout['nome']: scout for scout in response.data}
+            # Create a dictionary for scout selection (id-based for stability)
+            scouts_map = {scout['id']: scout for scout in response.data}
+            scouts_display = {scout['id']: scout['nome'] for scout in response.data}
             
             # Reset selection index if needed
             if st.session_state.clear_edit_selection:
@@ -242,15 +243,19 @@ with tab3:
             else:
                 default_index = 0
             
-            selected_scout_name = st.selectbox(
+            id_list = list(scouts_map.keys())
+            # Keep deterministic ordering by sorting names but keep ids aligned
+            id_list = sorted(id_list, key=lambda i: scouts_display.get(i, ""))
+            selected_scout_id = st.selectbox(
                 "Selecione um escuteiro",
-                options=sorted(scouts_dict.keys()),
+                options=id_list,
                 index=default_index,
+                format_func=lambda iid: scouts_display.get(iid, str(iid)),
                 key="scout_selector"
             )
-            
-            if selected_scout_name:
-                scout = scouts_dict[selected_scout_name]
+
+            if selected_scout_id:
+                scout = scouts_map[selected_scout_id]
                 
                 col1, col2 = st.columns([3, 1])
                 

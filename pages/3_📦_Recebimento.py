@@ -185,16 +185,21 @@ with tab2:
                 st.success("✅ Todos os blocos atribuídos já foram totalmente recebidos!")
                 st.info("💡 Se precisar registar um novo recebimento, atribua mais blocos aos escuteiros.")
             else:
-                # Block selection (OUTSIDE form for dynamic updates)
-                blocks_dict = {label: (block, saldo, total_rifas) for label, block, saldo, total_rifas in blocks_list}
-                selected_block_label = st.selectbox(
+                # Block selection (OUTSIDE form for dynamic updates) - use id-based options
+                id_list = [block['id'] for _, block, _, _ in blocks_list]
+                display_map = {block['id']: label for label, block, _, _ in blocks_list}
+                blocks_map = {block['id']: (block, saldo, total_rifas) for label, block, saldo, total_rifas in blocks_list}
+
+                selected_block_id = st.selectbox(
                     "Bloco (Escuteiro) *",
-                    options=list(blocks_dict.keys()),
-                    help="Selecione o bloco que o escuteiro está a entregar"
+                    options=id_list,
+                    format_func=lambda bid: display_map.get(bid, str(bid)),
+                    help="Selecione o bloco que o escuteiro está a entregar",
+                    key="recebimento_block_select"
                 )
-                
+
                 # Get block data - updates when selection changes!
-                selected_block, saldo_pendente, total_rifas = blocks_dict[selected_block_label]
+                selected_block, saldo_pendente, total_rifas = blocks_map[selected_block_id]
                 preco_bloco = float(selected_block.get('preco_bloco', 0))
                 
                 col1, col2 = st.columns(2)
@@ -325,29 +330,33 @@ with tab3:
                         'id, numero_inicial, numero_final, preco_bloco, escuteiro_id, escuteiros(nome)'
                     ).not_.is_('escuteiro_id', 'null').order('numero_inicial').execute()
                     
-                    # Create blocks dictionary
-                    blocks_dict = {}
-                    current_block_label = None
+                    # Create blocks mapping (id-based)
+                    blocks_map = {}
+                    display_map = {}
+                    current_block_id = None
                     for block in blocks_response.data:
                         escuteiro = block.get('escuteiros', {})
                         scout_name = escuteiro.get('nome', 'N/A') if escuteiro else 'N/A'
                         total_rifas = block['numero_final'] - block['numero_inicial'] + 1
                         label = f"{scout_name} | Rifas {block['numero_inicial']}-{block['numero_final']} | {total_rifas} rifas"
-                        blocks_dict[label] = (block, total_rifas)
-                        
+                        blocks_map[block['id']] = (block, total_rifas)
+                        display_map[block['id']] = label
+
                         if block['id'] == receipt['bloco_id']:
-                            current_block_label = label
-                    
-                    # Block selection
-                    block_index = list(blocks_dict.keys()).index(current_block_label) if current_block_label and current_block_label in blocks_dict else 0
-                    new_block_label = st.selectbox(
+                            current_block_id = block['id']
+
+                    # Block selection (id-based)
+                    id_list = list(blocks_map.keys())
+                    default_index = id_list.index(current_block_id) if current_block_id in id_list else 0
+                    new_block_id = st.selectbox(
                         "Bloco (Escuteiro) *",
-                        options=list(blocks_dict.keys()),
-                        index=block_index,
+                        options=id_list,
+                        index=default_index,
+                        format_func=lambda bid: display_map.get(bid, str(bid)),
                         key="edit_block"
                     )
-                    
-                    new_block, total_rifas = blocks_dict[new_block_label]
+
+                    new_block, total_rifas = blocks_map[new_block_id]
                     
                     # Money received
                     new_valor_recebido = st.number_input(
