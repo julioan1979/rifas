@@ -22,7 +22,7 @@ Sistema completo desenvolvido em **Streamlit** com backend **Supabase** para ger
 
 ### ��️ Blocos de Rifas (Sistema Avançado)
 - 📦 **Criação automática** ao criar campanha
-- 🏷️ **Reserva por secção** (sem atribuição específica)
+-- 🏷️ **Reserva de blocos para uma secção** (sem atribuição a escuteiro)
 - 👤 **Atribuição individual** com prevenção de duplicação
 - 👨‍👩‍👧‍👦 **Atribuição para irmãos** com divisão automática
 - 🔒 Prevenção de reatribuição de blocos já atribuídos
@@ -105,7 +105,7 @@ rifas/
 
 ### 2. Reservar/Atribuir Blocos
 - Aceda a **🎟️ Blocos de Rifas**
-- **Tab 2:** Reservar por secção (sem escuteiro específico)
+- **Tab 2:** Reservar blocos para uma secção (sem escuteiro específico)
 - **Tab 3:** Atribuir individual ou para irmãos
 
 ### 3. Escuteiros Vendem Rifas (Externamente)
@@ -133,7 +133,7 @@ rifas/
 
 ### Campos Importantes
 - `blocos_rifas.campanha_id` - Relacionamento com campanha
-- `blocos_rifas.seccao` - Secção do bloco (Lobitos, Exploradores, etc)
+- `blocos_rifas.seccao` - Secção do bloco (Lobitos, Exploradores, Pioneiros, Caminheiros). Pode estar vazio (bloco totalmente livre) ou preenchido com uma secção real (bloco reservado para essa secção, mas ainda não atribuído a um escuteiro).
 - `blocos_rifas.escuteiro_id` - Escuteiro atribuído ao bloco
 - `blocos_rifas.estado` - Estado: disponivel, atribuido, vendido, devolvido
 
@@ -182,7 +182,7 @@ MIT License - Ver arquivo `LICENSE`
 ### Sistema de Irmãos
 - Radio button: Individual vs Irmãos
 - Divisão automática de blocos
-- Primeiro irmão recebe rifas extras (se ímpar)
+- Rifas extra são atribuídas ao primeiro irmão quando a divisão não é exata.
 - Nomes de todos os irmãos nos blocos criados
 
 ### Prevenção de Duplicação

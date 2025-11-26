@@ -32,7 +32,7 @@ ESTRUTURA DO BANCO DE DADOS
             preco_unitario, escuteiro_id, seccao, data_atribuicao, 
             estado, created_at
    - Estados possíveis: disponivel, atribuido, vendido, devolvido
-   - Secções: Reserva, Lobitos, Exploradores, Pioneiros, Caminheiros
+   - Secções: Lobitos, Exploradores, Pioneiros, Caminheiros
 
 4. vendas (LEGADO - mantido para compatibilidade)
    - Mantida apenas para dados históricos
