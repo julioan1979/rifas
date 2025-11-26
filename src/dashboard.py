@@ -31,7 +31,7 @@ def render_dashboard(campanha_id=None, show_instructions=True):
             st.markdown("""
             ## Bem-vindo ao Sistema de Gestão de Rifas! 🎯
 
-            Este sistema permite gerir todos os aspectos das rifas dos escuteiros de forma simples e eficiente.
+            Este sistema permite gerir todos os aspetos das rifas dos escuteiros de forma simples e eficiente.
 
             ### 📋 Funcionalidades disponíveis:
 
