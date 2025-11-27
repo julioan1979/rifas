@@ -1,4 +1,8 @@
+
+from utils.simple_auth import require_password
 import streamlit as st
+if not require_password("5212025"):
+    st.stop()
 import pandas as pd
 from datetime import datetime
 from utils.supabase_client import get_supabase_client

@@ -1,4 +1,8 @@
+
+from utils.simple_auth import require_password
 import streamlit as st
+if not require_password("5212025"):
+    st.stop()
 import pandas as pd
 from utils.supabase_client import get_supabase_client
 
@@ -61,52 +65,53 @@ with tab4:
     - Você pode obter os IDs corretos exportando as listas de blocos e escuteiros.
     """)
 
+
     import io
 
-
-    # Buscar blocos e escuteiros para exemplo real
-    blocos_resp = supabase.table('blocos_rifas').select('id,numero_inicial,numero_final').eq('campanha_id', selected_campanha['id']).execute()
-    escuteiros_resp = supabase.table('escuteiros').select('id,nome').execute()
-    blocos = blocos_resp.data or []
+    # Buscar escuteiros para sheet auxiliar
+    escuteiros_resp = supabase.table('escuteiros').select('id,nome,seccao').execute()
     escuteiros = escuteiros_resp.data or []
 
-    # Gerar todas as combinações possíveis de blocos e escuteiros
-    linhas = []
-    from datetime import date
-    data_exemplo = date.today().isoformat()
-    for b in blocos:
-        for e in escuteiros:
-            linhas.append({
-                'bloco_id': b['id'],
-                'escuteiro_id': e['id'],
-                'data_atribuicao': data_exemplo,
-                'observacoes': 'Atribuição em lote',
-                'bloco_info': f"Rifas {b.get('numero_inicial','?')}-{b.get('numero_final','?')}",
-                'escuteiro_nome': e.get('nome','')
-            })
-    colunas_modelo = ['bloco_id','escuteiro_id','data_atribuicao','observacoes','bloco_info','escuteiro_nome']
-    if not linhas:
-        # Garante colunas mesmo sem dados
-        modelo_df = pd.DataFrame(columns=colunas_modelo)
+    # Buscar blocos da campanha selecionada para aba de apoio
+
+    blocos_resp = supabase.table('blocos_rifas').select('id,numero_inicial,numero_final,estado,escuteiro_id,data_atribuicao,observacoes').eq('campanha_id', selected_campanha['id']).order('numero_inicial').execute()
+    blocos = blocos_resp.data or []
+
+    # Sheet principal: só cabeçalhos e linha vazia
+    colunas_modelo = ['bloco_id','escuteiro_id','data_atribuicao','observacoes']
+    modelo_df = pd.DataFrame([ {col: '' for col in colunas_modelo} ])
+
+    # Sheet auxiliar: escuteiros
+    if escuteiros:
+        escuteiros_df = pd.DataFrame(escuteiros)[['id','nome','seccao']]
     else:
-        modelo_df = pd.DataFrame(linhas)
-        # Garante que todas as colunas estejam presentes
-        for col in colunas_modelo:
-            if col not in modelo_df.columns:
-                modelo_df[col] = ''
+        escuteiros_df = pd.DataFrame(columns=['id','nome','seccao'])
+
+    # Sheet auxiliar: blocos (agora com data_atribuicao e observacoes)
+    blocos_cols = ['id','numero_inicial','numero_final','estado','escuteiro_id','data_atribuicao','observacoes']
+    if blocos:
+        blocos_df = pd.DataFrame(blocos)
+        for col in blocos_cols:
+            if col not in blocos_df.columns:
+                blocos_df[col] = ''
+        blocos_df = blocos_df[blocos_cols]
+    else:
+        blocos_df = pd.DataFrame(columns=blocos_cols)
+
+    # Gerar Excel com múltiplas sheets
     modelo_bytes = io.BytesIO()
-    modelo_df[colunas_modelo].to_excel(modelo_bytes, index=False)
+    with pd.ExcelWriter(modelo_bytes, engine='xlsxwriter') as writer:
+        modelo_df.to_excel(writer, index=False, sheet_name='ModeloAtribuicao')
+        escuteiros_df.to_excel(writer, index=False, sheet_name='Escuteiros')
+        blocos_df.to_excel(writer, index=False, sheet_name='Blocos')
     modelo_bytes.seek(0)
     st.download_button(
-        label="⬇️ Baixar modelo Excel (com exemplos reais)",
+        label="⬇️ Baixar modelo Excel (com sheets de apoio)",
         data=modelo_bytes,
         file_name="modelo_atribuicao_blocos.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-    if not blocos or not escuteiros:
-        st.warning("⚠️ Não há blocos ou escuteiros cadastrados para gerar exemplos reais. O modelo terá apenas placeholders.")
-    else:
-        st.caption("Exemplo de IDs válidos incluídos no modelo. Preencha opcionalmente data_atribuicao (YYYY-MM-DD) e observacoes.")
+    st.caption("O modelo agora inclui apenas cabeçalhos e abas auxiliares com escuteiros, secção e blocos disponíveis. Preencha bloco_id e escuteiro_id conforme necessário.")
 
     st.markdown("---")
     st.markdown("### 1️⃣ Faça upload do Excel preenchido")

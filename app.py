@@ -1,4 +1,10 @@
 import streamlit as st
+from utils.simple_auth import require_password
+
+
+# Exigir autenticação simples (senha interna)
+if not require_password("5212025"):
+	st.stop()
 
 
 st.set_page_config(
