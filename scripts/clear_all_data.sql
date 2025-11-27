@@ -1,46 +1,48 @@
--- Script para limpar todos os dados das tabelas mantendo o schema
--- Execute este SQL no Supabase SQL Editor
--- ATENÇÃO: Isto vai apagar TODOS os dados das tabelas!
+-- scripts/clear_all_data.sql
+--
+-- Limpador de dados para testes
+--
+-- ATENÇÃO: Faça backup antes de executar.
+-- Execução recomendada: copie este conteúdo para o SQL Editor do Supabase
+-- (ou execute com psql ligado ao seu projeto). Este script TRUNCATEIA todas
+-- as tabelas do schema `public`, reinicia as sequences e usa CASCADE para
+-- contornar constraints de FK.
 
--- Desabilitar triggers temporariamente (se necessário)
-SET session_replication_role = replica;
+-- Observações:
+-- - Este script não altera objetos em schemas diferentes (ex: `auth`).
+-- - Se precisar também limpar o schema `auth` (usuários), proceda com
+--   cautela — normalmente não é recomendado em ambientes Supabase geridos.
+-- - Se tiver tabelas que não quer truncar (ex: migrations, configurações),
+--   adicione os nomes no array de exclusão abaixo.
 
--- Limpar tabelas na ordem correta (respeitando foreign keys)
--- Primeiro as tabelas dependentes, depois as principais
+BEGIN;
 
--- 1. Limpar pagamentos (depende de vendas e blocos_rifas)
-TRUNCATE TABLE pagamentos RESTART IDENTITY CASCADE;
+-- Trabalhamos explicitamente no schema public
+SET search_path = public;
 
--- 2. Limpar devoluções (depende de escuteiros e blocos_rifas)
-TRUNCATE TABLE devolucoes RESTART IDENTITY CASCADE;
+-- Lista de tabelas a excluir do truncate (adicione nomes se necessário)
+-- Ex.: ('alvo_para_manter','outra_tabela')
+DO $$
+DECLARE
+  exclude_tables TEXT[] := ARRAY[ 'spatial_ref_sys' ];
+  r RECORD;
+BEGIN
+  FOR r IN
+    SELECT tablename
+    FROM pg_tables
+    WHERE schemaname = 'public'
+      AND tablename NOT LIKE 'pg_%'
+      AND NOT (tablename = ANY (exclude_tables))
+  LOOP
+    RAISE NOTICE 'Truncating table: %', r.tablename;
+    EXECUTE format('TRUNCATE TABLE public.%I RESTART IDENTITY CASCADE;', r.tablename);
+  END LOOP;
+END
+$$;
 
--- 3. Limpar vendas (depende de escuteiros e blocos_rifas)
-TRUNCATE TABLE vendas RESTART IDENTITY CASCADE;
+COMMIT;
 
--- 4. Limpar blocos_rifas (depende de escuteiros e campanhas)
-TRUNCATE TABLE blocos_rifas RESTART IDENTITY CASCADE;
+-- Recomenda-se VACUUM após limpeza, executável separadamente
+-- VACUUM FULL;
 
--- 5. Limpar escuteiros (tabela independente)
-TRUNCATE TABLE escuteiros RESTART IDENTITY CASCADE;
-
--- 6. Limpar campanhas (tabela independente)
-TRUNCATE TABLE campanhas RESTART IDENTITY CASCADE;
-
--- Reabilitar triggers
-SET session_replication_role = DEFAULT;
-
--- Verificar que todas as tabelas foram limpas
-SELECT 'pagamentos' as tabela, COUNT(*) as registos FROM pagamentos
-UNION ALL
-SELECT 'devolucoes' as tabela, COUNT(*) as registos FROM devolucoes
-UNION ALL
-SELECT 'vendas' as tabela, COUNT(*) as registos FROM vendas
-UNION ALL
-SELECT 'blocos_rifas' as tabela, COUNT(*) as registos FROM blocos_rifas
-UNION ALL
-SELECT 'escuteiros' as tabela, COUNT(*) as registos FROM escuteiros
-UNION ALL
-SELECT 'campanhas' as tabela, COUNT(*) as registos FROM campanhas;
-
--- Mensagem de sucesso
-SELECT 'Todos os dados foram limpos com sucesso! As tabelas estão vazias e prontas para novos registos.' as resultado;
+-- Fim do script
